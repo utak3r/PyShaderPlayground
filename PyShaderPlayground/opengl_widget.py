@@ -1,5 +1,5 @@
 from PySide2.QtWidgets import QOpenGLWidget
-from PySide2.QtGui import QOpenGLShader, QOpenGLShaderProgram, QOpenGLFunctions
+from PySide2.QtGui import QOpenGLShader, QOpenGLShaderProgram
 from OpenGL import GL as gl
 from PySide2.QtCore import QTimer
 
