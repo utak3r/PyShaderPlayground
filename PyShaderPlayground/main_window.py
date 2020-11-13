@@ -14,6 +14,8 @@ class ShaderPlayground(QMainWindow):
         #self.centralWidget().player.resize(800,450)
         #self.centralWidget().player.show()
         self.opengl.show()
+
+        self.centralWidget().txtShaderEditor.setText(self.opengl.get_shader())
         self.centralWidget().btnCompile.clicked.connect(self.compile_shader)
 
     def init_ui(self, filename):

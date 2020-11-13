@@ -18,7 +18,12 @@ class ShaderWidget(QOpenGLWidget):
         self.global_time: float = 0.0
         self.shader_template_pre_ = ""
         self.shader_template_post_ = ""
-        self.shader_user_ = ""
+        self.shader_user_ = \
+            "void mainImage( out vec4 fragColor, in vec2 fragCoord )\n" \
+            "{\n" \
+            "vec2 uv = fragCoord.xy / iResolution.xy;\n" \
+            "fragColor = vec4(uv,0.5+0.5*sin(iGlobalTime.x),1.0);\n" \
+            "}\n"
         self.shader_fallback_ = ""
         
         self.vertices_ = [ -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0 ]
@@ -104,6 +109,9 @@ class ShaderWidget(QOpenGLWidget):
         self.timer_.start()
         self.program_.release()
         self.doneCurrent()
+
+    def get_shader(self) -> str:
+        return self.shader_user_
 
     def resizeGL(self, width, height):
         """ Resize OGL window. """
