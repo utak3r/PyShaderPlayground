@@ -2,6 +2,7 @@ from PySide2.QtCore import QCoreApplication, Qt, Slot, QUrl, QFile, QIODevice, Q
 from PySide2.QtWidgets import QApplication, QFileDialog, QMainWindow
 from PySide2.QtUiTools import QUiLoader
 from PyShaderPlayground.opengl_widget import ShaderWidget
+from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
 
 class ShaderPlayground(QMainWindow):
     def __init__(self):
@@ -13,6 +14,7 @@ class ShaderPlayground(QMainWindow):
         #self.centralWidget().player = ShaderWidget()
         #self.centralWidget().player.resize(800,450)
         #self.centralWidget().player.show()
+        self.syntax_highlighter = GLSLSyntaxHighlighter(self.centralWidget().txtShaderEditor.document())
         self.opengl.show()
 
         self.centralWidget().txtShaderEditor.setText(self.opengl.get_shader())
