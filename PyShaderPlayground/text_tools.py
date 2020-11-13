@@ -13,15 +13,24 @@ class GLSLSyntaxHighlighter(QSyntaxHighlighter):
         self.keyword_format.setForeground(Qt.darkBlue)
         self.keyword_format.setFontWeight(QFont.Bold)
         keyword_patterns = [
+            "\\bvoid\\b", "\\breturn\\b", "\\bin\\b", "\\bout\\b"
+        ]
+        for pattern in keyword_patterns:
+            rule = HighlightingRule(pattern, self.keyword_format)
+            self.highlightingRules.append(rule)
+        # data types format
+        self.datatype_format = QTextCharFormat()
+        self.datatype_format.setForeground(Qt.darkBlue)
+        datatypes_patterns = [
             "\\bfloat\\b", "\\bint\\b", "\\bbool\\b", "\\buint\\b",
             "\\bdouble\\b", "\\bvec2\\b", "\\bvec3\\b", "\\bvec4\\b",
             "\\bdvec2\\b", "\\bdvec3\\b", "\\bdvec4\\b", "\\bivec2\\b",
             "\\bivec3\\b", "\\bivec4\\b", "\\buvec2\\b", "\\buvec3\\b",
             "\\buvec4\\b", "\\bbvec2\\b", "\\bbvec3\\b", "\\bbvec4\\b",
-            "\\bmat3\\b", "\\bvoid\\b", "\\breturn\\b", "\\bin\\b", "\\bout\\b"
+            "\\bmat3\\b"
         ]
-        for pattern in keyword_patterns:
-            rule = HighlightingRule(pattern, self.keyword_format)
+        for pattern in datatypes_patterns:
+            rule = HighlightingRule(pattern, self.datatype_format)
             self.highlightingRules.append(rule)
         # comments format
         self.comment_format = QTextCharFormat()
