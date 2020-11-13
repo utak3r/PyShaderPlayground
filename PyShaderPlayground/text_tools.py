@@ -45,9 +45,9 @@ class GLSLSyntaxHighlighter(QSyntaxHighlighter):
         rule = HighlightingRule("\".*\"", self.quotation_format)
         self.highlightingRules.append(rule)
 
-
-    def find_match(self, text: str, regexpr: QRegularExpression, offset: int = 0)
-    """ Find position of a first occurence of RegExp in text. """
+    @staticmethod
+    def find_match(text: str, regexpr: QRegularExpression, offset: int = 0) -> int:
+        """ Find position of a first occurence of RegExp in text. """
         found = -1
         match = regexpr.match(text, offset)
         if match.hasMatch():
