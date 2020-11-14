@@ -32,7 +32,7 @@ class ShaderPlayground(QMainWindow):
         loader = U3UiLoader()
         loader.addPluginPath("PyShaderPlayground/")
         loader.registerCustomWidget(ShaderWidget)
-        print(loader.availableWidgets())
+        #print(loader.availableWidgets())
         file = QFile(filename)
         file.open(QIODevice.ReadOnly)
         self.setCentralWidget(loader.load(file, self))
