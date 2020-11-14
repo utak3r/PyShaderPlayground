@@ -21,6 +21,11 @@ class ShaderPlayground(QMainWindow):
 
         self.current_filename = ""
         self.resize(1280, 720)
+        if self.opengl.is_playing():
+            self.centralWidget().btnPlayPause.setText("Pause")
+        else:
+            self.centralWidget().btnPlayPause.setText("Play")
+
 
     def init_ui(self, filename):
         """ Read UI from file. """
@@ -65,6 +70,10 @@ class ShaderPlayground(QMainWindow):
     @Slot()
     def play_pause_animation(self):
         self.opengl.animation_play_pause()
+        if self.opengl.is_playing():
+            self.centralWidget().btnPlayPause.setText("Pause")
+        else:
+            self.centralWidget().btnPlayPause.setText("Play")
     
     @Slot()
     def rewind_animation(self):
