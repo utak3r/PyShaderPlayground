@@ -1,13 +1,22 @@
 from PySide2.QtWidgets import QOpenGLWidget
-from PySide2.QtGui import QOpenGLShader, QOpenGLShaderProgram
+from PySide2.QtGui import QOpenGLShader, QOpenGLShaderProgram, QSurfaceFormat
 from OpenGL import GL as gl
 from PySide2.QtCore import QTimer
 
 class ShaderWidget(QOpenGLWidget):
-    def __init__(self, width: int, height: int, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.width_ = width
-        self.height_ = height
+
+        # Setting up modern OpenGL format
+        OpenGL_format = QSurfaceFormat()
+        # OpenGL_format.setDepthBufferSize(24)
+        # OpenGL_format.setStencilBufferSize(8)
+        OpenGL_format.setVersion(1, 2)
+        OpenGL_format.setProfile(QSurfaceFormat.CoreProfile)
+        QSurfaceFormat.setDefaultFormat(OpenGL_format)
+
+        self.width_ = self.width()
+        self.height_ = self.height()
         self.vao_ = None
         self.program_ = None
         self.shader_vertex_ = None
@@ -37,7 +46,18 @@ class ShaderWidget(QOpenGLWidget):
     def timer_tick(self):
         """ Increment self.global_time variable for animating. """
         self.global_time = self.global_time + 0.1
-        #self.paintGL()
+
+    def is_playing(self):
+        return self.timer_.isActive()
+
+    def animation_play_pause(self):
+        if self.is_playing():
+            self.timer_.stop()
+        else:
+            self.timer_.start()
+    
+    def animation_rewind(self):
+        self.global_time = 0.0
 
     def initializeGL(self):
         """ Initialize OpenGL and related things. """
@@ -110,8 +130,10 @@ class ShaderWidget(QOpenGLWidget):
         self.program_.release()
         self.doneCurrent()
 
+
     def get_shader(self) -> str:
         return self.shader_user_
+
 
     def resizeGL(self, width, height):
         """ Resize OGL window. """
@@ -119,7 +141,6 @@ class ShaderWidget(QOpenGLWidget):
         self.height_ = height
         func = self.context().functions()
         func.glViewport(0, 0, self.width_, self.height_)
-        self.parent().resize(self.width_, self.height_)
 
 
     def paintGL(self):
