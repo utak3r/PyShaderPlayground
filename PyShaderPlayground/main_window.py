@@ -87,7 +87,7 @@ class ShaderPlayground(QMainWindow):
     def save_image(self):
         """ Save current state as an image. """
         filename = QFileDialog.getSaveFileName(self, "Save image as...", 
-            "render_image.jpg", "Images (*.jpg)")
+            "render_image", "Image Files (*.png *.jpg)")
         if filename[0] != "":
             self.opengl.save_image(filename[0])
 

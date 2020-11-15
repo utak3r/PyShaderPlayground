@@ -2,6 +2,7 @@ from PySide2.QtWidgets import QOpenGLWidget
 from PySide2.QtGui import QOpenGLShader, QOpenGLShaderProgram, QSurfaceFormat
 from OpenGL import GL as gl
 from PySide2.QtCore import QTimer
+import os
 
 class ShaderWidget(QOpenGLWidget):
     def __init__(self, parent=None):
@@ -172,5 +173,10 @@ class ShaderWidget(QOpenGLWidget):
         self.update()
 
     def save_image(self, filename: str):
+        """ Grabs current frame buffer into an image file of a given filename. """
         img = self.grabFramebuffer()
-        img.save(filename, "JPG", 90)
+        name, ext = os.path.splitext(filename)
+        img_type = "PNG"
+        if ext.casefold() == ".jpg" or ext.casefold() == ".jpeg":
+            img_type = "JPG"
+        img.save(filename, img_type, 90)
