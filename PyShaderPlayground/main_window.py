@@ -18,6 +18,8 @@ class ShaderPlayground(QMainWindow):
         self.centralWidget().btnSaveFile.clicked.connect(self.save_shader_to_file)
         self.centralWidget().btnPlayPause.clicked.connect(self.play_pause_animation)
         self.centralWidget().btnRewind.clicked.connect(self.rewind_animation)
+        self.centralWidget().btnSaveImage.clicked.connect(self.save_image)
+        self.centralWidget().btnRecordAnimation.setEnabled(False)
 
         self.current_filename = ""
         self.resize(1280, 720)
@@ -69,6 +71,7 @@ class ShaderPlayground(QMainWindow):
 
     @Slot()
     def play_pause_animation(self):
+        """ Play/Pause animation. """
         self.opengl.animation_play_pause()
         if self.opengl.is_playing():
             self.centralWidget().btnPlayPause.setText("Pause")
@@ -77,7 +80,18 @@ class ShaderPlayground(QMainWindow):
     
     @Slot()
     def rewind_animation(self):
+        """ Rewind an animation. Doesn't change the playing state. """
         self.opengl.animation_rewind()
+    
+    @Slot()
+    def save_image(self):
+        """ Save current state as an image. """
+        filename = QFileDialog.getSaveFileName(self, "Save image as...", 
+            "render_image.jpg", "Images (*.jpg)")
+        if filename[0] != "":
+            self.opengl.save_image(filename[0])
+
+
 
 class U3UiLoader(QUiLoader):
     """ Custom UiLoader, for loading up custom widgets. """

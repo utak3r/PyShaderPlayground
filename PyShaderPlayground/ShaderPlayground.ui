@@ -16,17 +16,8 @@
   <layout class="QVBoxLayout" name="verticalLayout_3">
    <item>
     <widget class="QSplitter" name="splitter">
-     <property name="frameShape">
-      <enum>QFrame::NoFrame</enum>
-     </property>
-     <property name="lineWidth">
-      <number>4</number>
-     </property>
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="handleWidth">
-      <number>10</number>
      </property>
      <widget class="QWidget" name="">
       <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -69,11 +60,25 @@
            </property>
           </spacer>
          </item>
+         <item>
+          <widget class="QPushButton" name="btnSaveImage">
+           <property name="text">
+            <string>Save image</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnRecordAnimation">
+           <property name="text">
+            <string>Record animation</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget">
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <widget class="QTextEdit" name="txtShaderEditor"/>

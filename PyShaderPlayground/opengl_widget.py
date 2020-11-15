@@ -48,15 +48,18 @@ class ShaderWidget(QOpenGLWidget):
         self.global_time = self.global_time + 0.1
 
     def is_playing(self):
+        """ Returns True if animation is playing, False otherwise. """
         return self.timer_.isActive()
 
     def animation_play_pause(self):
+        """ Switch between playing/paused states. """
         if self.is_playing():
             self.timer_.stop()
         else:
             self.timer_.start()
     
     def animation_rewind(self):
+        """ Rewinds the animation by resetting the global timer counter. """
         self.global_time = 0.0
 
     def initializeGL(self):
@@ -167,3 +170,7 @@ class ShaderWidget(QOpenGLWidget):
         func.glDisable(gl.GL_DEPTH_TEST)
         func.glDisable(gl.GL_CULL_FACE)
         self.update()
+
+    def save_image(self, filename: str):
+        img = self.grabFramebuffer()
+        img.save(filename, "JPG", 90)
