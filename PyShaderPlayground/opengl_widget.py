@@ -1,4 +1,4 @@
-from PySide2.QtWidgets import QOpenGLWidget
+from PySide2.QtWidgets import QOpenGLWidget, QMessageBox
 from PySide2.QtGui import QOpenGLShader, QOpenGLShaderProgram, QSurfaceFormat, QOpenGLFramebufferObject, QImage
 from OpenGL import GL as gl
 from PySide2.QtCore import QTimer
@@ -134,16 +134,20 @@ class ShaderWidget(QOpenGLWidget):
 
         self.makeCurrent()
         self.shader_user_ = user_shader
-        self.shader_fragment_.compileSourceCode(self.shader_template_pre_ + self.shader_user_ + self.shader_template_post_)
-        self.program_.removeAllShaders()
-        self.program_.addShader(self.shader_vertex_)
-        self.program_.addShader(self.shader_fragment_)
-        self.program_.link()
-        self.program_.bind()
+        if not self.shader_fragment_.compileSourceCode(self.shader_template_pre_ + self.shader_user_ + self.shader_template_post_):
+            log = self.shader_fragment_.log()
+            QMessageBox.critical(self, "Shader compile problem", log, QMessageBox.Ok)
+        else:
+            self.program_.removeAllShaders()
+            self.program_.addShader(self.shader_vertex_)
+            self.program_.addShader(self.shader_fragment_)
+            self.program_.link()
+            self.program_.bind()
 
-        self.attrib_position = self.program_.attributeLocation("position")
-        self.uniform_iGlobalTime = self.program_.uniformLocation("iGlobalTime")
-        self.uniform_iResolution = self.program_.uniformLocation("iResolution")
+            self.attrib_position = self.program_.attributeLocation("position")
+            self.uniform_iGlobalTime = self.program_.uniformLocation("iGlobalTime")
+            self.uniform_iResolution = self.program_.uniformLocation("iResolution")
+            self.uniform_iChannel0 = self.program_.uniformLocation("iChannel0")
 
         self.timer_.start()
         self.program_.release()
