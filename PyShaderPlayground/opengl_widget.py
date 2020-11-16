@@ -26,6 +26,9 @@ class ShaderWidget(QOpenGLWidget):
         self.uniform_iResolution = None
         self.uniform_iGlobalTime = None
         self.global_time: float = 0.0
+        self.framerate_ = 50
+        self.anim_speed_ = 2.0
+        self.anim_speed_modifier_ = 1.0
         self.shader_template_pre_ = ""
         self.shader_template_post_ = ""
         self.shader_user_ = \
@@ -41,12 +44,18 @@ class ShaderWidget(QOpenGLWidget):
 
         self.timer_ = QTimer(self)
         self.timer_.timeout.connect(self.timer_tick)
-        self.timer_.setInterval(1000 / 50)
+        self.set_animation_speed(2.0, 50)
         self.timer_.start()
+
+    def set_animation_speed(self, speed: float=1.0, framerate: float=50):
+        """ How many "ones" per second? And what's a desired framerate? """
+        self.framerate_ = framerate
+        self.anim_speed_ = speed
+        self.timer_.setInterval(1000 / self.framerate_)
 
     def timer_tick(self):
         """ Increment self.global_time variable for animating. """
-        self.global_time = self.global_time + 0.1
+        self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * self.framerate_ / 1000.0)
 
     def is_playing(self):
         """ Returns True if animation is playing, False otherwise. """
@@ -62,6 +71,12 @@ class ShaderWidget(QOpenGLWidget):
     def animation_rewind(self):
         """ Rewinds the animation by resetting the global timer counter. """
         self.global_time = 0.0
+
+    def set_animation_speed_modifier(self, value):
+        """ Temporary animation speed changing. """
+        self.anim_speed_modifier_ = value
+        if value != 1.0 and not self.is_playing():
+            self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * self.framerate_ / 1000.0)
 
     def initializeGL(self):
         """ Initialize OpenGL and related things. """
@@ -136,6 +151,7 @@ class ShaderWidget(QOpenGLWidget):
 
 
     def get_shader(self) -> str:
+        """ Returns user's part of a shader. """
         return self.shader_user_
 
 

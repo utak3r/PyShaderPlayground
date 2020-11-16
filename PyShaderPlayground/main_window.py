@@ -1,5 +1,5 @@
-from PySide2.QtCore import QCoreApplication, Qt, Slot, QUrl, QFile, QIODevice, QFileInfo
-from PySide2.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog
+from PySide2.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo
+from PySide2.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider
 from PySide2.QtUiTools import QUiLoader
 from PyShaderPlayground.opengl_widget import ShaderWidget
 from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
@@ -21,6 +21,7 @@ class ShaderPlayground(QMainWindow):
         self.centralWidget().btnRewind.clicked.connect(self.rewind_animation)
         self.centralWidget().btnSaveImage.clicked.connect(self.save_image)
         self.centralWidget().btnRecordAnimation.setEnabled(False)
+        self.centralWidget().AnimationSlider.valueUpdated.connect(self.change_animation)
 
         self.current_filename = ""
         self.resize(1280, 540)
@@ -85,6 +86,14 @@ class ShaderPlayground(QMainWindow):
     def rewind_animation(self):
         """ Rewind an animation. Doesn't change the playing state. """
         self.opengl.animation_rewind()
+
+    @Slot()
+    def change_animation(self, value):
+        """ User rubs the animation slider back or forth. """
+        modifier = 1.0
+        if value != 0:
+            modifier = float(value) / 10.0
+        self.opengl.set_animation_speed_modifier(modifier)
     
     @Slot()
     def save_image(self):
@@ -104,9 +113,9 @@ class ShaderPlayground(QMainWindow):
             resolution_dialog.Form.layout().setContentsMargins(8, 8, 8, 8)
             resolution_dialog.Form.edWidth.setValue(self.last_render_size[0])
             resolution_dialog.Form.edHeight.setValue(self.last_render_size[1])
-            resolution_dialog.Form.edWidth.valueChanged.connect(lambda val: self.resolution_dlg_width_changed(resolution_dialog, True, False, False))
-            resolution_dialog.Form.edHeight.valueChanged.connect(lambda val: self.resolution_dlg_width_changed(resolution_dialog, False, True, False))
-            resolution_dialog.Form.cbxKeepAspectRatio.stateChanged.connect(lambda val: self.resolution_dlg_width_changed(resolution_dialog, False, False, True))
+            resolution_dialog.Form.edWidth.valueChanged.connect(lambda val: self.resolution_dlg_value_changed(resolution_dialog, True, False, False))
+            resolution_dialog.Form.edHeight.valueChanged.connect(lambda val: self.resolution_dlg_value_changed(resolution_dialog, False, True, False))
+            resolution_dialog.Form.cbxKeepAspectRatio.stateChanged.connect(lambda val: self.resolution_dlg_value_changed(resolution_dialog, False, False, True))
             
             if QDialog.Accepted == resolution_dialog.exec():
                 width = resolution_dialog.Form.edWidth.value()
@@ -115,7 +124,7 @@ class ShaderPlayground(QMainWindow):
                 self.opengl.render_image(filename[0], width, height)
 
     @Slot()
-    def resolution_dlg_width_changed(self, dlg, is_width_changed: bool, is_height_changed: bool, is_aspect_checked: bool):
+    def resolution_dlg_value_changed(self, dlg, is_width_changed: bool, is_height_changed: bool, is_aspect_checked: bool):
         """ Maintaining aspect ratio for resolution dialog. """
         is_aspect = dlg.Form.cbxKeepAspectRatio.isChecked()
         width = dlg.Form.edWidth.value()
@@ -140,6 +149,31 @@ class U3UiLoader(QUiLoader):
     def createWidget(self, className, parent=None, name=""):
         if className == "ShaderWidget":
             widget = ShaderWidget(parent)
+        elif className == "SpringSlider":
+            widget = SpringSlider(parent)
         else:
             widget = super().createWidget(className, parent, name)
         return widget
+
+class SpringSlider(QSlider):
+    """ Spring recoil slider. """
+
+    valueUpdated = Signal(int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setRange(-100, 100)
+        self.setSliderPosition(0)
+        self.setTracking(True)
+        self.sliderReleased.connect(self.sliderRelease)
+        self.valueChanged.connect(self.valueUpdate)
+
+    def sliderRelease(self):
+        """ If user released the slider, bring it back to 0. """
+        self.setValue(0)
+
+    def valueUpdate(self, value):
+        """ If slider is grabbed, just pass the value. If not (it was clicked), set to 0. """
+        if not self.isSliderDown():
+            self.setValue(0)
+        self.valueUpdated.emit(value)
