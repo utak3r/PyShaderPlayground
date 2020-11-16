@@ -1,5 +1,5 @@
 from PySide2.QtWidgets import QOpenGLWidget
-from PySide2.QtGui import QOpenGLShader, QOpenGLShaderProgram, QSurfaceFormat
+from PySide2.QtGui import QOpenGLShader, QOpenGLShaderProgram, QSurfaceFormat, QOpenGLFramebufferObject, QImage
 from OpenGL import GL as gl
 from PySide2.QtCore import QTimer
 import os
@@ -172,11 +172,38 @@ class ShaderWidget(QOpenGLWidget):
         func.glDisable(gl.GL_CULL_FACE)
         self.update()
 
-    def save_image(self, filename: str):
-        """ Grabs current frame buffer into an image file of a given filename. """
-        img = self.grabFramebuffer()
+
+    def render_image(self, filename: str, width: int, height: int):
+        """ Offscreen rendering with a specified size, saved to a file. """
         name, ext = os.path.splitext(filename)
         img_type = "PNG"
         if ext.casefold() == ".jpg" or ext.casefold() == ".jpeg":
             img_type = "JPG"
-        img.save(filename, img_type, 90)
+        # save screen rendering size
+        orig_width = self.width_
+        orig_height = self.height_
+        # create an offscreen frame buffer
+        buffer = QOpenGLFramebufferObject(width, height)
+        buffer.bind()
+        self.resizeGL(width, height)
+        self.paintGL()
+        # save image
+        image = buffer.toImage()
+        image.save(filename, img_type, 90)
+        # restore screen rendering
+        buffer.release()
+        self.resizeGL(orig_width, orig_height)
+
+
+    @staticmethod
+    def maintain_aspect_ratio(width: int, height: int, aspect: float):
+        """ Maintain aspect ratio of an image.
+        It always modifies the shorter side.
+        """
+        ret_width = width
+        ret_height = height
+        if width > height:
+            ret_height = width / aspect
+        else:
+            ret_width = height * aspect
+        return [ret_width, ret_height]
