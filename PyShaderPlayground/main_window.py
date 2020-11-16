@@ -9,6 +9,7 @@ class ShaderPlayground(QMainWindow):
         QMainWindow.__init__(self)
         self.init_ui("PyShaderPlayground/ShaderPlayground.ui")
         self.opengl = self.centralWidget().player
+        self.setWindowTitle("Shader Playground")
 
         self.syntax_highlighter = GLSLSyntaxHighlighter(self.centralWidget().txtShaderEditor.document())
 
@@ -22,7 +23,7 @@ class ShaderPlayground(QMainWindow):
         self.centralWidget().btnRecordAnimation.setEnabled(False)
 
         self.current_filename = ""
-        self.resize(1280, 720)
+        self.resize(1280, 540)
         if self.opengl.is_playing():
             self.centralWidget().btnPlayPause.setText("Pause")
         else:
