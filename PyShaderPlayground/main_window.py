@@ -1,8 +1,10 @@
 from PySide2.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo
-from PySide2.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider
+from PySide2.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel
+from PySide2.QtGui import QPixmap, QImage
 from PySide2.QtUiTools import QUiLoader
 from PyShaderPlayground.opengl_widget import ShaderWidget
 from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
+from pathlib import Path
 
 class ShaderPlayground(QMainWindow):
     def __init__(self):
@@ -31,6 +33,9 @@ class ShaderPlayground(QMainWindow):
             self.centralWidget().btnPlayPause.setText("Play")
         self.last_render_size = [1920, 1080]
         self.render_aspect_ratio = self.last_render_size[0] / self.last_render_size[1]
+        self.set_texture_0(0, "texture.jpg")
+        self.centralWidget().texture0.set_image("None")
+        self.centralWidget().texture0.clicked.connect(self.load_texture_0)
 
 
     def init_ui(self, filename):
@@ -143,6 +148,20 @@ class ShaderPlayground(QMainWindow):
         dlg.Form.edWidth.blockSignals(False)
         dlg.Form.edHeight.blockSignals(False)
 
+    def set_texture_0(self, channel: int, filename: str):
+        """ Set texture to a given filename. """
+        if filename != "":
+            self.opengl.set_texture(channel, filename)
+            if channel == 0:
+                self.centralWidget().texture0.set_image(filename)
+
+    @Slot()
+    def load_texture_0(self):
+        """ Let user select a texture nr 0. """
+        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg)")
+        if filename[0] != "":
+            self.set_texture_0(0, filename[0])
+
 
 class U3UiLoader(QUiLoader):
     """ Custom UiLoader, for loading up custom widgets. """
@@ -151,6 +170,8 @@ class U3UiLoader(QUiLoader):
             widget = ShaderWidget(parent)
         elif className == "SpringSlider":
             widget = SpringSlider(parent)
+        elif className == "ImageThumbnail":
+            widget = ImageThumbnail(parent)
         else:
             widget = super().createWidget(className, parent, name)
         return widget
@@ -177,3 +198,32 @@ class SpringSlider(QSlider):
         if not self.isSliderDown():
             self.setValue(0)
         self.valueUpdated.emit(value)
+
+
+class ImageThumbnail(QLabel):
+    """ Clickable image thumbnail. """
+
+    clicked = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.filename = "Empty"
+        self.set_image(self.filename)
+
+    def mouseReleaseEvent(self, event):
+        """ React on mouse released event. """
+        self.clicked.emit()
+
+    def set_image(self, filename):
+        """ Set the thumbnail. """
+        pixmap = None
+        file = Path(filename)
+        if file.is_file():
+            pixmap = QPixmap(QImage(filename).scaled(100, 100, Qt.KeepAspectRatio))
+            self.filename = filename
+        else:
+            pixmap = QPixmap(100, 100)
+            pixmap.fill(Qt.black)
+            self.filename = "Empty"
+        self.setPixmap(pixmap)
+        self.setToolTip(self.filename)
