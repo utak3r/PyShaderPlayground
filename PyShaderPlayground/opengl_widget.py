@@ -59,6 +59,10 @@ class ShaderWidget(QOpenGLWidget):
         """ Increment self.global_time variable for animating. """
         self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * self.framerate_ / 1000.0)
 
+    def animation_framerate(self):
+        """ Returns current animation's framerate. """
+        return self.framerate_
+
     def is_playing(self):
         """ Returns True if animation is playing, False otherwise. """
         return self.timer_.isActive()
@@ -66,9 +70,22 @@ class ShaderWidget(QOpenGLWidget):
     def animation_play_pause(self):
         """ Switch between playing/paused states. """
         if self.is_playing():
-            self.timer_.stop()
+            self.animation_pause()
         else:
-            self.timer_.start()
+            self.animation_play()
+
+    def animation_pause(self):
+        """ Pause animation. """
+        self.timer_.stop()
+
+    def animation_play(self):
+        """ Play animation. """
+        self.timer_.start()
+    
+    def animation_stop(self):
+        """ Stop and rewind. """
+        self.animation_pause()
+        self.animation_rewind()
     
     def animation_rewind(self):
         """ Rewinds the animation by resetting the global timer counter. """
@@ -79,6 +96,10 @@ class ShaderWidget(QOpenGLWidget):
         self.anim_speed_modifier_ = value
         if value != 1.0 and not self.is_playing():
             self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * self.framerate_ / 1000.0)
+
+    def increment_animation(self, frames: int):
+        """ Advance animation for given frames number. """
+        self.global_time = self.global_time + frames * (self.anim_speed_ * self.framerate_ / 1000.0)
 
     def initializeGL(self):
         """ Initialize OpenGL and related things. """

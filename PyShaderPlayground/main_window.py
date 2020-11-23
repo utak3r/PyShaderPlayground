@@ -5,6 +5,7 @@ from PySide2.QtUiTools import QUiLoader
 from PyShaderPlayground.opengl_widget import ShaderWidget
 from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
 from pathlib import Path
+from PyShaderPlayground.process_tools import ProcessRunner
 
 class ShaderPlayground(QMainWindow):
     def __init__(self):
@@ -22,7 +23,7 @@ class ShaderPlayground(QMainWindow):
         self.centralWidget().btnPlayPause.clicked.connect(self.play_pause_animation)
         self.centralWidget().btnRewind.clicked.connect(self.rewind_animation)
         self.centralWidget().btnSaveImage.clicked.connect(self.save_image)
-        self.centralWidget().btnRecordAnimation.setEnabled(False)
+        self.centralWidget().btnRecordAnimation.clicked.connect(self.render_animation)
         self.centralWidget().AnimationSlider.valueUpdated.connect(self.change_animation)
 
         self.current_filename = ""
@@ -36,6 +37,7 @@ class ShaderPlayground(QMainWindow):
         self.set_texture_0(0, "texture.jpg")
         self.centralWidget().texture0.set_image("None")
         self.centralWidget().texture0.clicked.connect(self.load_texture_0)
+        self.runner = None
 
 
     def init_ui(self, filename):
@@ -100,6 +102,20 @@ class ShaderPlayground(QMainWindow):
             modifier = float(value) / 10.0
         self.opengl.set_animation_speed_modifier(modifier)
     
+    def set_texture_0(self, channel: int, filename: str):
+        """ Set texture to a given filename. """
+        if filename != "":
+            self.opengl.set_texture(channel, filename)
+            if channel == 0:
+                self.centralWidget().texture0.set_image(filename)
+
+    @Slot()
+    def load_texture_0(self):
+        """ Let user select a texture nr 0. """
+        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg)")
+        if filename[0] != "":
+            self.set_texture_0(0, filename[0])
+
     @Slot()
     def save_image(self):
         """ Save current state as an image. """
@@ -148,19 +164,57 @@ class ShaderPlayground(QMainWindow):
         dlg.Form.edWidth.blockSignals(False)
         dlg.Form.edHeight.blockSignals(False)
 
-    def set_texture_0(self, channel: int, filename: str):
-        """ Set texture to a given filename. """
-        if filename != "":
-            self.opengl.set_texture(channel, filename)
-            if channel == 0:
-                self.centralWidget().texture0.set_image(filename)
-
     @Slot()
-    def load_texture_0(self):
-        """ Let user select a texture nr 0. """
-        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg)")
+    def render_animation(self):
+        filename = QFileDialog.getSaveFileName(self, "Save video as...", 
+            "render_image", "Video Files (*.mp4)")
         if filename[0] != "":
-            self.set_texture_0(0, filename[0])
+            resolution_dialog = QDialog(self)
+            ui_loader = QUiLoader()
+            ui_file = QFile("PyShaderPlayground/ResolutionDialog.ui")
+            ui_file.open(QIODevice.ReadOnly)
+            resolution_dialog.Form = ui_loader.load(ui_file, resolution_dialog)
+            ui_file.close()
+            resolution_dialog.setWindowTitle("Set image resolution:")
+            resolution_dialog.Form.buttonBox.accepted.connect(resolution_dialog.accept)
+            resolution_dialog.Form.buttonBox.rejected.connect(resolution_dialog.reject)
+            resolution_dialog.Form.layout().setContentsMargins(8, 8, 8, 8)
+            resolution_dialog.Form.edWidth.setValue(self.last_render_size[0])
+            resolution_dialog.Form.edHeight.setValue(self.last_render_size[1])
+            resolution_dialog.Form.edWidth.valueChanged.connect(lambda val: self.resolution_dlg_value_changed(resolution_dialog, True, False, False))
+            resolution_dialog.Form.edHeight.valueChanged.connect(lambda val: self.resolution_dlg_value_changed(resolution_dialog, False, True, False))
+            resolution_dialog.Form.cbxKeepAspectRatio.stateChanged.connect(lambda val: self.resolution_dlg_value_changed(resolution_dialog, False, False, True))
+            
+            if QDialog.Accepted == resolution_dialog.exec():
+                width = resolution_dialog.Form.edWidth.value()
+                height = resolution_dialog.Form.edHeight.value()
+                self.last_render_size = [width, height]
+                #self.opengl.render_image(filename[0], width, height)
+                file_dir = Path(filename[0]).parent
+                temp_dir = file_dir.joinpath(Path(filename[0]).name + ".temp")
+                temp_dir.mkdir()
+                # info
+                duration = 10
+                framerate = self.opengl.animation_framerate()
+                frames = duration * framerate
+                ffmpeg = "\"c:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe\""
+                codec = "-c:v libx264 -preset medium -tune animation"
+                # render frames
+                self.opengl.animation_stop()
+                for frame in range (0, frames):
+                    self.opengl.render_image(str(temp_dir.joinpath("frame_{:06d}.png".format(frame))), width, height)
+                    self.opengl.increment_animation(1)
+                # encode video
+                command = ffmpeg + " -r " + str(framerate) + " -f image2 -i \"" + str(temp_dir.joinpath("frame_")) + "%06d.png\" " + codec + " -y \"" + filename[0] + "\""
+                self.runner = ProcessRunner()
+                self.runner.run_command(command)
+                # remove temp files and dir
+                tmpfiles = temp_dir.glob("*.*")
+                for tmpfile in tmpfiles:
+                    tmpfile.unlink()
+                temp_dir.rmdir()
+                self.opengl.animation_play()
+
 
 
 class U3UiLoader(QUiLoader):
