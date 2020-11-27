@@ -24,6 +24,8 @@ class ProcessRunner(QDialog):
     def run_command(self, command):
         """ Run a given command asynchronously. """
         self.show()
+        self.raise_()
+        self.activateWindow()
         self.add_log(command)
         QCoreApplication.processEvents()
         asyncio.run(self.run(command))

@@ -122,6 +122,7 @@ class ShaderWidget(QOpenGLWidget):
             "uniform vec3 iResolution;				// The viewport resolution (z is pixel aspect ratio, usually 1.0)\n" \
             "uniform vec2 iGlobalTime;				// shader playback time (in seconds)\n" \
             "uniform sampler2D iChannel0;			// Sampler for input texture\n" \
+            "float iTime = iGlobalTime.x;\n" \
             "\n "
         self.shader_template_post_ = \
             "\n" \

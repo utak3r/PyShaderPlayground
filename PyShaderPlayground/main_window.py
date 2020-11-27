@@ -1,20 +1,26 @@
-from PySide2.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo
-from PySide2.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel
+from PySide2.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo, QSettings, QRect
+from PySide2.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel, QSplitterHandle, QHBoxLayout, QFrame, QProgressBar, QProgressDialog
 from PySide2.QtGui import QPixmap, QImage
 from PySide2.QtUiTools import QUiLoader
 from PyShaderPlayground.opengl_widget import ShaderWidget
 from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
 from pathlib import Path
 from PyShaderPlayground.process_tools import ProcessRunner
+from PyShaderPlayground.VideoEncodingParams import VideoEncodingParams
 
 class ShaderPlayground(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
         self.init_ui("PyShaderPlayground/ShaderPlayground.ui")
         self.opengl = self.centralWidget().player
-        self.setWindowTitle("Shader Playground")
-
         self.syntax_highlighter = GLSLSyntaxHighlighter(self.centralWidget().txtShaderEditor.document())
+
+        self.settings = QSettings("ShaderPlayground.ini", QSettings.IniFormat)
+        self.settings.beginGroup("Geometry")
+        self.setGeometry(self.settings.value("MainWindowGeometry", QRect(320, 250, 1280, 540)))
+        if self.settings.contains("Splitter_geometry"):
+            self.centralWidget().splitter.restoreGeometry(self.settings.value("Splitter_geometry"))
+        self.settings.endGroup()
 
         self.centralWidget().txtShaderEditor.setText(self.opengl.get_shader())
         self.centralWidget().btnCompile.clicked.connect(self.compile_shader)
@@ -50,6 +56,29 @@ class ShaderPlayground(QMainWindow):
         file.open(QIODevice.ReadOnly)
         self.setCentralWidget(loader.load(file, self))
         file.close()
+        self.setWindowTitle("Shader Playground")
+        
+        self.centralWidget().splitter.setHandleWidth(10)
+        handle = self.centralWidget().splitter.handle(1)
+        layout = QHBoxLayout(handle)
+        layout.setSpacing(0)
+        layout.setMargin(0)
+        for i in range (0, 2):
+            line = QFrame(handle)
+            line.setFrameShape(QFrame.VLine)
+            line.setFrameShadow(QFrame.Sunken)
+            line.setLineWidth(1)
+            layout.addWidget(line)
+
+
+    def closeEvent(self, event):
+        """ Closing the main window. """
+        self.settings.beginGroup("Geometry")
+        self.settings.setValue("MainWindowGeometry", self.geometry())
+        self.settings.setValue("Splitter_geometry", self.centralWidget().splitter.saveGeometry())
+        self.settings.endGroup()
+        self.settings.sync()
+        super().closeEvent(event)
 
     @Slot()
     def compile_shader(self):
@@ -166,54 +195,58 @@ class ShaderPlayground(QMainWindow):
 
     @Slot()
     def render_animation(self):
+        """ Render animation frames and encodde them into a video. """
         filename = QFileDialog.getSaveFileName(self, "Save video as...", 
-            "render_image", "Video Files (*.mp4)")
+            "render_image", "Video Files (*.mp4 *.mov *.avi)")
         if filename[0] != "":
-            resolution_dialog = QDialog(self)
-            ui_loader = QUiLoader()
-            ui_file = QFile("PyShaderPlayground/ResolutionDialog.ui")
-            ui_file.open(QIODevice.ReadOnly)
-            resolution_dialog.Form = ui_loader.load(ui_file, resolution_dialog)
-            ui_file.close()
-            resolution_dialog.setWindowTitle("Set image resolution:")
-            resolution_dialog.Form.buttonBox.accepted.connect(resolution_dialog.accept)
-            resolution_dialog.Form.buttonBox.rejected.connect(resolution_dialog.reject)
-            resolution_dialog.Form.layout().setContentsMargins(8, 8, 8, 8)
-            resolution_dialog.Form.edWidth.setValue(self.last_render_size[0])
-            resolution_dialog.Form.edHeight.setValue(self.last_render_size[1])
-            resolution_dialog.Form.edWidth.valueChanged.connect(lambda val: self.resolution_dlg_value_changed(resolution_dialog, True, False, False))
-            resolution_dialog.Form.edHeight.valueChanged.connect(lambda val: self.resolution_dlg_value_changed(resolution_dialog, False, True, False))
-            resolution_dialog.Form.cbxKeepAspectRatio.stateChanged.connect(lambda val: self.resolution_dlg_value_changed(resolution_dialog, False, False, True))
-            
-            if QDialog.Accepted == resolution_dialog.exec():
-                width = resolution_dialog.Form.edWidth.value()
-                height = resolution_dialog.Form.edHeight.value()
-                self.last_render_size = [width, height]
-                #self.opengl.render_image(filename[0], width, height)
+            params_dialog = VideoEncodingParams(self.settings, self)
+            if QDialog.Accepted == params_dialog.exec():
+                width = params_dialog.get_width()
+                height = params_dialog.get_height()
                 file_dir = Path(filename[0]).parent
-                temp_dir = file_dir.joinpath(Path(filename[0]).name + ".temp")
-                temp_dir.mkdir()
+                temp_dir = file_dir.joinpath(Path(filename[0]).name + ".temp4render")
+                # create temporary directory for rendered frames
+                try:
+                    temp_dir.mkdir()
+                except FileExistsError as exc:
+                    ShaderPlayground.remove_dir(temp_dir)
+                    temp_dir.mkdir()
                 # info
-                duration = 10
-                framerate = self.opengl.animation_framerate()
+                duration = params_dialog.get_duration()
+                framerate = params_dialog.get_framerate()
                 frames = duration * framerate
-                ffmpeg = "\"c:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe\""
-                codec = "-c:v libx264 -preset medium -tune animation"
+                ffmpeg = "\"" + params_dialog.get_ffmpeg() + "\""
+                codec = params_dialog.get_codec()
                 # render frames
                 self.opengl.animation_stop()
-                for frame in range (0, frames):
+                render_progress_dlg = QProgressDialog("Rendering frames...", "Abort rendering", 0, frames, self)
+                render_progress_dlg.setWindowModality(Qt.WindowModal)
+                was_canceled = False
+                for frame in range (frames):
+                    render_progress_dlg.setValue(frame)
+                    if render_progress_dlg.wasCanceled():
+                        was_canceled = True
+                        break
                     self.opengl.render_image(str(temp_dir.joinpath("frame_{:06d}.png".format(frame))), width, height)
                     self.opengl.increment_animation(1)
-                # encode video
-                command = ffmpeg + " -r " + str(framerate) + " -f image2 -i \"" + str(temp_dir.joinpath("frame_")) + "%06d.png\" " + codec + " -y \"" + filename[0] + "\""
-                self.runner = ProcessRunner()
-                self.runner.run_command(command)
+                render_progress_dlg.setValue(frames)
+                if not was_canceled:
+                    # encode video
+                    command = ffmpeg + " -r " + str(framerate) + " -f image2 -i \"" + str(temp_dir.joinpath("frame_")) + "%06d.png\" " + codec + " -y \"" + filename[0] + "\""
+                    self.runner = ProcessRunner()
+                    self.runner.run_command(command)
                 # remove temp files and dir
-                tmpfiles = temp_dir.glob("*.*")
-                for tmpfile in tmpfiles:
-                    tmpfile.unlink()
-                temp_dir.rmdir()
+                ShaderPlayground.remove_dir(temp_dir)
+                # resume playing
                 self.opengl.animation_play()
+
+    @staticmethod
+    def remove_dir(directory: Path):
+        """Empties the directory and removes it. """
+        files = directory.glob("*.*")
+        for file in files:
+            file.unlink()
+        directory.rmdir()
 
 
 
