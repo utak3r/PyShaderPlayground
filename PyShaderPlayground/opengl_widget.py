@@ -36,8 +36,12 @@ class ShaderWidget(QOpenGLWidget):
         self.shader_user_ = \
             "void mainImage( out vec4 fragColor, in vec2 fragCoord )\n" \
             "{\n" \
+            "// You can use:\n" \
+            "// vec3 iResolution - The viewport resolution (z is pixel aspect ratio, usually 1.0)\n" \
+            "// float iTime - shader playback time (in seconds)\n" \
+            "// sampler2D iChannel0 - Sampler for input texture\n\n" \
             "vec2 uv = fragCoord.xy / iResolution.xy;\n" \
-            "fragColor = vec4(uv,0.5+0.5*sin(iGlobalTime.x),1.0);\n" \
+            "fragColor = vec4(uv,0.5+0.5*sin(iTime),1.0);\n" \
             "}\n"
         self.shader_fallback_ = ""
         
