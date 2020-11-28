@@ -24,10 +24,12 @@ class ShaderWidget(QOpenGLWidget):
         self.shader_fragment_ = None
         self.attrib_position = None
         self.uniform_iResolution = None
+        self.uniform_iMouse = None
         self.uniform_iGlobalTime = None
         self.uniform_iChannel0 = None
         self.texture_0_ = None
         self.global_time: float = 0.0
+        self.mouse = [0.0, 0.0, 0.0, 0.0]
         self.framerate_ = 50
         self.anim_speed_ = 2.0
         self.anim_speed_modifier_ = 1.0
@@ -39,6 +41,7 @@ class ShaderWidget(QOpenGLWidget):
             "// You can use:\n" \
             "// vec3 iResolution - The viewport resolution (z is pixel aspect ratio, usually 1.0)\n" \
             "// float iTime - shader playback time (in seconds)\n" \
+            "// vec4 iMouse - mouse pixel coords. xy: current (if MLB down), zw: click. Range [-1.0 - 1.0], [0,0] in the middle\n" \
             "// sampler2D iChannel0 - Sampler for input texture\n\n" \
             "vec2 uv = fragCoord.xy / iResolution.xy;\n" \
             "fragColor = vec4(uv,0.5+0.5*sin(iTime),1.0);\n" \
@@ -125,6 +128,7 @@ class ShaderWidget(QOpenGLWidget):
             "#version 130\n" \
             "uniform vec3 iResolution;				// The viewport resolution (z is pixel aspect ratio, usually 1.0)\n" \
             "uniform vec2 iGlobalTime;				// shader playback time (in seconds)\n" \
+            "uniform vec4 iMouse;                   // mouse pixel coords. xy: current (if MLB down), zw: click\n" \
             "uniform sampler2D iChannel0;			// Sampler for input texture\n" \
             "float iTime = iGlobalTime.x;\n" \
             "\n "
@@ -153,6 +157,7 @@ class ShaderWidget(QOpenGLWidget):
         self.attrib_position = self.program_.attributeLocation("position")
         self.uniform_iGlobalTime = self.program_.uniformLocation("iGlobalTime")
         self.uniform_iResolution = self.program_.uniformLocation("iResolution")
+        self.uniform_iMouse = self.program_.uniformLocation("iMouse")
         self.uniform_iChannel0 = self.program_.uniformLocation("iChannel0")
 
         self.program_.release()
@@ -177,6 +182,7 @@ class ShaderWidget(QOpenGLWidget):
             self.attrib_position = self.program_.attributeLocation("position")
             self.uniform_iGlobalTime = self.program_.uniformLocation("iGlobalTime")
             self.uniform_iResolution = self.program_.uniformLocation("iResolution")
+            self.uniform_iMouse = self.program_.uniformLocation("iMouse")
             self.uniform_iChannel0 = self.program_.uniformLocation("iChannel0")
 
         self.timer_.start()
@@ -211,6 +217,7 @@ class ShaderWidget(QOpenGLWidget):
         self.program_.bind()
         self.program_.setUniformValue(self.uniform_iGlobalTime, self.global_time, 0.0)
         self.program_.setUniformValue(self.uniform_iResolution, float(self.width_), float(self.height_), 0.0)
+        self.program_.setUniformValue(self.uniform_iMouse, self.mouse[0], self.mouse[1], self.mouse[2], self.mouse[3])
         if self.texture_0_ is not None:
             self.texture_0_.bind()
         self.program_.setUniformValue(self.uniform_iChannel0, int(0))
@@ -277,3 +284,19 @@ class ShaderWidget(QOpenGLWidget):
         texture.setWrapMode(QOpenGLTexture.Repeat)
         texture.setData(QImage(image).mirrored())
         return texture
+
+    def mousePressEvent(self, event):
+        x = event.localPos().x()
+        y = event.localPos().y()
+        self.mouse[0] = float(x) / float(self.width_) * 2.0 - 1.0
+        self.mouse[1] = float(y) / float(self.height_) * 2.0 - 1.0
+        self.mouse[2] = self.mouse[0]
+        self.mouse[3] = self.mouse[1]
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        x = event.localPos().x()
+        y = event.localPos().y()
+        self.mouse[0] = float(x) / float(self.width_) * 2.0 - 1.0
+        self.mouse[1] = float(y) / float(self.height_) * 2.0 - 1.0
+        super().mouseMoveEvent(event)
