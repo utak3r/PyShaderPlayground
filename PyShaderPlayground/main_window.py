@@ -41,7 +41,7 @@ class ShaderPlayground(QMainWindow):
         self.last_render_size = [1920, 1080]
         self.render_aspect_ratio = self.last_render_size[0] / self.last_render_size[1]
         self.set_texture_0(0, "texture.jpg")
-        self.centralWidget().texture0.set_image("None")
+        #self.centralWidget().texture0.set_image("None")
         self.centralWidget().texture0.clicked.connect(self.load_texture_0)
         self.runner = None
 
@@ -136,7 +136,7 @@ class ShaderPlayground(QMainWindow):
         if filename != "":
             self.opengl.set_texture(channel, filename)
             if channel == 0:
-                self.centralWidget().texture0.set_image(filename)
+                self.centralWidget().texture0.set_image(self.opengl.get_texture_thumbnail(channel))
 
     @Slot()
     def load_texture_0(self):
@@ -301,7 +301,7 @@ class ImageThumbnail(QLabel):
         """ React on mouse released event. """
         self.clicked.emit()
 
-    def set_image(self, filename):
+    def set_image(self, filename: str):
         """ Set the thumbnail. """
         pixmap = None
         file = Path(filename)
@@ -314,3 +314,7 @@ class ImageThumbnail(QLabel):
             self.filename = "Empty"
         self.setPixmap(pixmap)
         self.setToolTip(self.filename)
+
+    def set_image(self, pixmap: QPixmap):
+        """ Set the thumbnail. """
+        self.setPixmap(pixmap)
