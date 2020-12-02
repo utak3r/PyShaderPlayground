@@ -3,6 +3,7 @@ from PySide2.QtGui import QOpenGLShader, QOpenGLShaderProgram, QSurfaceFormat, Q
 from OpenGL import GL as gl
 from PySide2.QtCore import QTimer
 import os
+from PyShaderPlayground.ShaderPlaygroundInputs import InputTexture, InputTexture2D, InputTextureSound
 
 class ShaderWidget(QOpenGLWidget):
     def __init__(self, parent=None):
@@ -27,7 +28,7 @@ class ShaderWidget(QOpenGLWidget):
         self.uniform_iMouse = None
         self.uniform_iGlobalTime = None
         self.uniform_iChannel0 = None
-        self.texture_0_ = None
+        self.texture_0_ = InputTexture()
         self.global_time: float = 0.0
         self.mouse = [0.0, 0.0, 0.0, 0.0]
         self.framerate_ = 50
@@ -218,8 +219,9 @@ class ShaderWidget(QOpenGLWidget):
         self.program_.setUniformValue(self.uniform_iGlobalTime, self.global_time, 0.0)
         self.program_.setUniformValue(self.uniform_iResolution, float(self.width_), float(self.height_), 0.0)
         self.program_.setUniformValue(self.uniform_iMouse, self.mouse[0], self.mouse[1], self.mouse[2], self.mouse[3])
-        if self.texture_0_ is not None:
-            self.texture_0_.bind()
+        
+        if isinstance(self.texture_0_, InputTexture2D) or isinstance(self.texture_0_, InputTextureSound):
+            self.texture_0_.get_texture().bind()
         self.program_.setUniformValue(self.uniform_iChannel0, int(0))
 
         self.program_.setAttributeArray(self.attrib_position, self.vertices_, 2, 0)
@@ -273,7 +275,17 @@ class ShaderWidget(QOpenGLWidget):
         """ Set texture nr 0 from given filename. """
         if channel == 0:
             if self.isValid():
-                self.texture_0_ = ShaderWidget.make_texture(image)
+                self.texture_0_ = InputTexture2D(image)
+
+    def get_texture(self, channel: int):
+        if channel == 0:
+            if self.isValid():
+                return self.texture_0_
+
+    def get_texture_thumbnail(self, channel: int):
+        if channel == 0:
+            if self.texture_0_ is not None:
+                return self.texture_0_.get_thumbnail()
 
     @staticmethod
     def make_texture(image: str) -> QOpenGLTexture:
