@@ -2,7 +2,7 @@
 
 PyShaderPlayground is a simple tool for editing GLSL fragment shaders and instantly testing them in an OpenGL window. There're few predefined uniforms, like image resolution or running time. The names of those are made to be compatible with *ShaderToy*. The editor has a simple syntax highlighting.
 
-![](screenshot.png)
+![](docs/screenshot.png)
 
 ## Requirements
 
