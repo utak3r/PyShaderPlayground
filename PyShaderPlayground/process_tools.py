@@ -1,7 +1,7 @@
 import asyncio
-from PySide2.QtWidgets import QDialog
-from PySide2.QtUiTools import QUiLoader
-from PySide2.QtCore import QCoreApplication, Slot, QFile, QIODevice
+from PySide6.QtWidgets import QDialog
+from PySide6.QtUiTools import QUiLoader
+from PySide6.QtCore import QCoreApplication, Slot, QFile, QIODevice
 
 class ProcessRunner(QDialog):
     """ Running a shell command with stdout and stderr output in a text window. """

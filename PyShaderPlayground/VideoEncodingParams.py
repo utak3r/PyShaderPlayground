@@ -1,6 +1,6 @@
-from PySide2.QtWidgets import QDialog, QFileDialog
-from PySide2.QtUiTools import QUiLoader
-from PySide2.QtCore import QCoreApplication, Slot, QFile, QIODevice, QSettings, QFileInfo
+from PySide6.QtWidgets import QDialog, QFileDialog
+from PySide6.QtUiTools import QUiLoader
+from PySide6.QtCore import QCoreApplication, Slot, QFile, QIODevice, QSettings, QFileInfo
 from enum import IntEnum
 
 class VideoEncodingParams(QDialog):
