@@ -1,7 +1,7 @@
-from PySide2.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo, QSettings, QRect
-from PySide2.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel, QSplitterHandle, QHBoxLayout, QFrame, QProgressBar, QProgressDialog
-from PySide2.QtGui import QPixmap, QImage
-from PySide2.QtUiTools import QUiLoader
+from PySide6.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo, QSettings, QRect
+from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel, QSplitterHandle, QHBoxLayout, QFrame, QProgressBar, QProgressDialog
+from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtUiTools import QUiLoader
 from PyShaderPlayground.opengl_widget import ShaderWidget
 from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
 from pathlib import Path
@@ -62,7 +62,7 @@ class ShaderPlayground(QMainWindow):
         handle = self.centralWidget().splitter.handle(1)
         layout = QHBoxLayout(handle)
         layout.setSpacing(0)
-        layout.setMargin(0)
+        #layout.setMargin(0)
         for i in range (0, 2):
             line = QFrame(handle)
             line.setFrameShape(QFrame.VLine)
@@ -136,12 +136,12 @@ class ShaderPlayground(QMainWindow):
         if filename != "":
             self.opengl.set_texture(channel, filename)
             if channel == 0:
-                self.centralWidget().texture0.set_image(self.opengl.get_texture_thumbnail(channel))
+                self.centralWidget().texture0.set_image_from_pixmap(self.opengl.get_texture_thumbnail(channel))
 
     @Slot()
     def load_texture_0(self):
         """ Let user select a texture nr 0. """
-        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg)")
+        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav)")
         if filename[0] != "":
             self.set_texture_0(0, filename[0])
 
@@ -294,14 +294,14 @@ class ImageThumbnail(QLabel):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.filename = "Empty"
-        self.set_image(self.filename)
+        self.filename = 'None'
+        self.set_image_from_file(self.filename)
 
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(self, event): # pylint: disable=invalid-name
         """ React on mouse released event. """
         self.clicked.emit()
 
-    def set_image(self, filename: str):
+    def set_image_from_file(self, filename: str):
         """ Set the thumbnail. """
         pixmap = None
         file = Path(filename)
@@ -311,10 +311,10 @@ class ImageThumbnail(QLabel):
         else:
             pixmap = QPixmap(100, 100)
             pixmap.fill(Qt.black)
-            self.filename = "Empty"
+            self.filename = 'None'
         self.setPixmap(pixmap)
         self.setToolTip(self.filename)
 
-    def set_image(self, pixmap: QPixmap):
+    def set_image_from_pixmap(self, pixmap: QPixmap):
         """ Set the thumbnail. """
         self.setPixmap(pixmap)

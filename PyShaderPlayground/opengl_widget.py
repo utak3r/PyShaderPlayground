@@ -1,8 +1,11 @@
-from PySide2.QtWidgets import QOpenGLWidget, QMessageBox
-from PySide2.QtGui import QOpenGLShader, QOpenGLShaderProgram, QSurfaceFormat, QOpenGLFramebufferObject, QImage, QOpenGLTexture
 from OpenGL import GL as gl
-from PySide2.QtCore import QTimer
+from PySide6.QtWidgets import QMessageBox
+from PySide6.QtOpenGLWidgets import QOpenGLWidget
+from PySide6.QtGui import QSurfaceFormat, QImage
+from PySide6.QtOpenGL import QOpenGLShader, QOpenGLShaderProgram, QOpenGLFramebufferObject, QOpenGLTexture
+from PySide6.QtCore import QTimer
 import os
+from pathlib import Path
 from PyShaderPlayground.ShaderPlaygroundInputs import InputTexture, InputTexture2D, InputTextureSound
 
 class ShaderWidget(QOpenGLWidget):
@@ -218,9 +221,9 @@ class ShaderWidget(QOpenGLWidget):
         self.program_.bind()
         self.program_.setUniformValue(self.uniform_iGlobalTime, self.global_time, 0.0)
         self.program_.setUniformValue(self.uniform_iResolution, float(self.width_), float(self.height_), 0.0)
-        self.program_.setUniformValue(self.uniform_iMouse, self.mouse[0], self.mouse[1], self.mouse[2], self.mouse[3])
-        
-        if isinstance(self.texture_0_, InputTexture2D) or isinstance(self.texture_0_, InputTextureSound):
+        self.program_.setUniformValue(self.uniform_iMouse, self.mouse[0], self.mouse[1], self.mouse[2], self.mouse[3])        
+        self.texture_0_.set_position(self.global_time)
+        if self.texture_0_.can_be_binded():
             self.texture_0_.get_texture().bind()
         self.program_.setUniformValue(self.uniform_iChannel0, int(0))
 
@@ -275,7 +278,11 @@ class ShaderWidget(QOpenGLWidget):
         """ Set texture nr 0 from given filename. """
         if channel == 0:
             if self.isValid():
-                self.texture_0_ = InputTexture2D(image)
+                file_ext = Path(image).suffix
+                if file_ext.casefold() == ".jpg" or file_ext.casefold() == ".png":
+                    self.texture_0_ = InputTexture2D(image)
+                elif file_ext.casefold() == ".wav":
+                    self.texture_0_ = InputTextureSound(image)
 
     def get_texture(self, channel: int):
         if channel == 0:

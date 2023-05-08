@@ -1,5 +1,5 @@
-from PySide2.QtGui import QSyntaxHighlighter, QTextCharFormat, QFont
-from PySide2.QtCore import Qt, QRegularExpression
+from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QFont
+from PySide6.QtCore import Qt, QRegularExpression
 
 class GLSLSyntaxHighlighter(QSyntaxHighlighter):
     """ Syntax highlighting for GLSL. """
