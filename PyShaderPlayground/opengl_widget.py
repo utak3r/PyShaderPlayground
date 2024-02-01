@@ -31,7 +31,9 @@ class ShaderWidget(QOpenGLWidget):
         self.uniform_iMouse = None
         self.uniform_iGlobalTime = None
         self.uniform_iChannel0 = None
+        self.uniform_iChannel1 = None
         self.texture_0_ = InputTexture()
+        self.texture_1_ = InputTexture()
         self.global_time: float = 0.0
         self.mouse = [0.0, 0.0, 0.0, 0.0]
         self.framerate_ = 50
@@ -134,6 +136,7 @@ class ShaderWidget(QOpenGLWidget):
             "uniform vec2 iGlobalTime;				// shader playback time (in seconds)\n" \
             "uniform vec4 iMouse;                   // mouse pixel coords. xy: current (if MLB down), zw: click\n" \
             "uniform sampler2D iChannel0;			// Sampler for input texture\n" \
+            "uniform sampler2D iChannel1;			// Sampler for input texture\n" \
             "float iTime = iGlobalTime.x;\n" \
             "\n "
         self.shader_template_post_ = \
@@ -163,6 +166,7 @@ class ShaderWidget(QOpenGLWidget):
         self.uniform_iResolution = self.program_.uniformLocation("iResolution")
         self.uniform_iMouse = self.program_.uniformLocation("iMouse")
         self.uniform_iChannel0 = self.program_.uniformLocation("iChannel0")
+        self.uniform_iChannel1 = self.program_.uniformLocation("iChannel1")
 
         self.program_.release()
 
@@ -188,6 +192,7 @@ class ShaderWidget(QOpenGLWidget):
             self.uniform_iResolution = self.program_.uniformLocation("iResolution")
             self.uniform_iMouse = self.program_.uniformLocation("iMouse")
             self.uniform_iChannel0 = self.program_.uniformLocation("iChannel0")
+            self.uniform_iChannel1 = self.program_.uniformLocation("iChannel1")
 
         self.timer_.start()
         self.program_.release()
@@ -226,6 +231,10 @@ class ShaderWidget(QOpenGLWidget):
         if self.texture_0_.can_be_binded():
             self.texture_0_.get_texture().bind()
         self.program_.setUniformValue(self.uniform_iChannel0, int(0))
+        self.texture_1_.set_position(self.global_time)
+        if self.texture_1_.can_be_binded():
+            self.texture_1_.get_texture().bind()
+        self.program_.setUniformValue(self.uniform_iChannel1, int(1))
 
         self.program_.setAttributeArray(self.attrib_position, self.vertices_, 2, 0)
         func.glEnableVertexAttribArray(self.attrib_position)
@@ -283,16 +292,29 @@ class ShaderWidget(QOpenGLWidget):
                     self.texture_0_ = InputTexture2D(image)
                 elif file_ext.casefold() == ".wav":
                     self.texture_0_ = InputTextureSound(image)
+        elif channel == 1:
+            if self.isValid():
+                file_ext = Path(image).suffix
+                if file_ext.casefold() == ".jpg" or file_ext.casefold() == ".png":
+                    self.texture_1_ = InputTexture2D(image)
+                elif file_ext.casefold() == ".wav":
+                    self.texture_1_ = InputTextureSound(image)
 
     def get_texture(self, channel: int):
         if channel == 0:
             if self.isValid():
                 return self.texture_0_
+        elif channel == 1:
+            if self.isValid():
+                return self.texture_1_
 
     def get_texture_thumbnail(self, channel: int):
         if channel == 0:
             if self.texture_0_ is not None:
                 return self.texture_0_.get_thumbnail()
+        elif channel == 1:
+            if self.texture_1_ is not None:
+                return self.texture_1_.get_thumbnail()
 
     @staticmethod
     def make_texture(image: str) -> QOpenGLTexture:

@@ -40,9 +40,11 @@ class ShaderPlayground(QMainWindow):
             self.centralWidget().btnPlayPause.setText("Play")
         self.last_render_size = [1920, 1080]
         self.render_aspect_ratio = self.last_render_size[0] / self.last_render_size[1]
-        self.set_texture_0(0, "texture.jpg")
+        self.set_texture(0, "texture.jpg")
+        self.set_texture(1, "texture.jpg")
         #self.centralWidget().texture0.set_image("None")
         self.centralWidget().texture0.clicked.connect(self.load_texture_0)
+        self.centralWidget().texture1.clicked.connect(self.load_texture_1)
         self.runner = None
 
 
@@ -131,19 +133,29 @@ class ShaderPlayground(QMainWindow):
             modifier = float(value) / 10.0
         self.opengl.set_animation_speed_modifier(modifier)
     
-    def set_texture_0(self, channel: int, filename: str):
+    @Slot()
+    def set_texture(self, channel: int, filename: str):
         """ Set texture to a given filename. """
         if filename != "":
             self.opengl.set_texture(channel, filename)
             if channel == 0:
                 self.centralWidget().texture0.set_image_from_pixmap(self.opengl.get_texture_thumbnail(channel))
+            elif channel == 1:
+                self.centralWidget().texture1.set_image_from_pixmap(self.opengl.get_texture_thumbnail(channel))
 
     @Slot()
     def load_texture_0(self):
         """ Let user select a texture nr 0. """
         filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav)")
         if filename[0] != "":
-            self.set_texture_0(0, filename[0])
+            self.set_texture(0, filename[0])
+
+    @Slot()
+    def load_texture_1(self):
+        """ Let user select a texture nr 1. """
+        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav)")
+        if filename[0] != "":
+            self.set_texture(1, filename[0])
 
     @Slot()
     def save_image(self):
