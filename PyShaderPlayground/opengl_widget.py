@@ -179,6 +179,9 @@ class ShaderWidget(QOpenGLWidget):
         self.shader_user_ = user_shader
         if not self.shader_fragment_.compileSourceCode(self.shader_template_pre_ + self.shader_user_ + self.shader_template_post_):
             log = self.shader_fragment_.log()
+            # for debug:
+            with open('fragment_shader.temp.glsl', 'w') as f:
+                f.write(self.shader_fragment_.sourceCode().toStdString())
             QMessageBox.critical(self, "Shader compile problem", log, QMessageBox.Ok)
         else:
             self.program_.removeAllShaders()
