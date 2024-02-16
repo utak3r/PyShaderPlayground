@@ -258,15 +258,19 @@ class ShaderWidget(QOpenGLWidget):
         orig_height = self.height_
         # create an offscreen frame buffer
         buffer = QOpenGLFramebufferObject(width, height)
-        buffer.bind()
-        self.resizeGL(width, height)
-        self.paintGL()
-        # save image
-        image = buffer.toImage()
-        image.save(filename, img_type, 90)
-        # restore screen rendering
-        buffer.release()
-        self.resizeGL(orig_width, orig_height)
+        if buffer.bind():
+            self.resizeGL(width, height)
+            self.paintGL()
+            # save image
+            fboImage = buffer.toImage()
+            image = QImage(fboImage.constBits(), fboImage.width(), fboImage.height(), QImage.Format_ARGB32)
+            #image = buffer.toImage()
+            image.save(filename, img_type, 95)
+            # restore screen rendering
+            buffer.release()
+            self.resizeGL(orig_width, orig_height)
+        else:
+            print("ShaderWidget.render_image: Unable to switch rendering from screen to FBO.")
 
 
     @staticmethod
