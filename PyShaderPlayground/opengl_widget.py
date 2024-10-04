@@ -1,23 +1,23 @@
 from OpenGL import GL as gl
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
-from PySide6.QtGui import QSurfaceFormat, QImage
+from PySide6.QtGui import QSurfaceFormat, QOpenGLFunctions, QImage
 from PySide6.QtOpenGL import QOpenGLShader, QOpenGLShaderProgram, QOpenGLFramebufferObject, QOpenGLTexture
 from PySide6.QtCore import QTimer
 import os
 from pathlib import Path
 from PyShaderPlayground.ShaderPlaygroundInputs import InputTexture, InputTexture2D, InputTextureSound
 
-class ShaderWidget(QOpenGLWidget):
+class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
     def __init__(self, parent=None):
-        super().__init__(parent)
+        QOpenGLWidget.__init__(self, parent)
+        QOpenGLFunctions.__init__(self)
 
-        # Setting up modern OpenGL format
-        OpenGL_format = QSurfaceFormat()
-        # OpenGL_format.setDepthBufferSize(24)
-        # OpenGL_format.setStencilBufferSize(8)
-        OpenGL_format.setVersion(1, 2)
-        OpenGL_format.setProfile(QSurfaceFormat.CoreProfile)
+        OpenGL_format = QSurfaceFormat.defaultFormat()
+        OpenGL_format.setProfile(QSurfaceFormat.defaultFormat().profile())
+        #OpenGL_format.setVersion(3, 1)
+        OpenGL_format.setDepthBufferSize(24)
+        OpenGL_format.setStencilBufferSize(8)
         QSurfaceFormat.setDefaultFormat(OpenGL_format)
 
         self.width_ = self.width()
@@ -116,12 +116,13 @@ class ShaderWidget(QOpenGLWidget):
 
     def initializeGL(self):
         """ Initialize OpenGL and related things. """
-        func = self.context().functions()
-        print(func.glGetString(gl.GL_RENDERER) + " OpenGL " + func.glGetString(gl.GL_VERSION))
+        self.initializeOpenGLFunctions()
+        #func = self.context().functions()
+        #print(func.glGetString(gl.GL_RENDERER) + " OpenGL " + func.glGetString(gl.GL_VERSION))
 
         self.shader_vertex_ = QOpenGLShader(QOpenGLShader.Vertex)
         self.shader_vertex_.compileSourceCode(
-            "#version 130\n" +
+            "#version 150\n" +
             "attribute vec3 position;\n" +
             "void main()\n" +
             "{\n" +
@@ -131,7 +132,7 @@ class ShaderWidget(QOpenGLWidget):
         self.shader_fragment_ = QOpenGLShader(QOpenGLShader.Fragment)
 
         self.shader_template_pre_ = \
-            "#version 130\n" \
+            "#version 150\n" \
             "uniform vec3 iResolution;				// The viewport resolution (z is pixel aspect ratio, usually 1.0)\n" \
             "uniform vec2 iGlobalTime;				// shader playback time (in seconds)\n" \
             "uniform vec4 iMouse;                   // mouse pixel coords. xy: current (if MLB down), zw: click\n" \
@@ -211,20 +212,20 @@ class ShaderWidget(QOpenGLWidget):
         """ Resize OGL window. """
         self.width_ = width
         self.height_ = height
-        func = self.context().functions()
-        func.glViewport(0, 0, self.width_, self.height_)
+        #func = self.context().functions()
+        self.glViewport(0, 0, self.width_, self.height_)
 
 
     def paintGL(self):
         """ Paint it! """
-        func = self.context().functions()
-        func.glClearColor(0.0, 0.0, 0.0, 1.0)
-        func.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+        #func = self.context().functions()
+        self.glClearColor(0.0, 0.0, 0.0, 1.0)
+        self.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
 
-        func.glFrontFace(gl.GL_CW)
-        func.glCullFace(gl.GL_FRONT)
-        func.glEnable(gl.GL_CULL_FACE)
-        func.glEnable(gl.GL_DEPTH_TEST)
+        self.glFrontFace(gl.GL_CW)
+        self.glCullFace(gl.GL_FRONT)
+        self.glEnable(gl.GL_CULL_FACE)
+        self.glEnable(gl.GL_DEPTH_TEST)
 
         self.program_.bind()
         self.program_.setUniformValue(self.uniform_iGlobalTime, self.global_time, 0.0)
@@ -240,13 +241,13 @@ class ShaderWidget(QOpenGLWidget):
         self.program_.setUniformValue(self.uniform_iChannel1, int(1))
 
         self.program_.setAttributeArray(self.attrib_position, self.vertices_, 2, 0)
-        func.glEnableVertexAttribArray(self.attrib_position)
-        func.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-        func.glDisableVertexAttribArray(self.attrib_position)
+        self.glEnableVertexAttribArray(self.attrib_position)
+        self.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+        self.glDisableVertexAttribArray(self.attrib_position)
 
         self.program_.release()
-        func.glDisable(gl.GL_DEPTH_TEST)
-        func.glDisable(gl.GL_CULL_FACE)
+        self.glDisable(gl.GL_DEPTH_TEST)
+        self.glDisable(gl.GL_CULL_FACE)
         self.update()
 
 
@@ -266,8 +267,9 @@ class ShaderWidget(QOpenGLWidget):
             self.paintGL()
             # save image
             fboImage = buffer.toImage()
+            fboImage.save(f'{name}_unpremultiplied.{ext}', img_type, 95)
+            # deal with unpremultiplied image
             image = QImage(fboImage.constBits(), fboImage.width(), fboImage.height(), QImage.Format_ARGB32)
-            #image = buffer.toImage()
             image.save(filename, img_type, 95)
             # restore screen rendering
             buffer.release()
