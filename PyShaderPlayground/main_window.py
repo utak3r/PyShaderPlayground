@@ -1,17 +1,18 @@
-from PySide2.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo, QSettings, QRect
-from PySide2.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel, QSplitterHandle, QHBoxLayout, QFrame, QProgressBar, QProgressDialog
-from PySide2.QtGui import QPixmap, QImage
-from PySide2.QtUiTools import QUiLoader
+from PySide6.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo, QSettings, QRect
+from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel, QSplitterHandle, QHBoxLayout, QFrame, QProgressBar, QProgressDialog
+from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtUiTools import QUiLoader
 from PyShaderPlayground.opengl_widget import ShaderWidget
 from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
 from pathlib import Path
 from PyShaderPlayground.process_tools import ProcessRunner
 from PyShaderPlayground.VideoEncodingParams import VideoEncodingParams
+from os import path
 
 class ShaderPlayground(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
-        self.init_ui("PyShaderPlayground/ShaderPlayground.ui")
+        self.init_ui(path.abspath(path.join(path.dirname(__file__), 'ShaderPlayground.ui')))
         self.opengl = self.centralWidget().player
         self.syntax_highlighter = GLSLSyntaxHighlighter(self.centralWidget().txtShaderEditor.document())
 
@@ -40,9 +41,11 @@ class ShaderPlayground(QMainWindow):
             self.centralWidget().btnPlayPause.setText("Play")
         self.last_render_size = [1920, 1080]
         self.render_aspect_ratio = self.last_render_size[0] / self.last_render_size[1]
-        self.set_texture_0(0, "texture.jpg")
-        self.centralWidget().texture0.set_image("None")
+        self.set_texture(0, "texture.jpg")
+        self.set_texture(1, "texture.jpg")
+        #self.centralWidget().texture0.set_image("None")
         self.centralWidget().texture0.clicked.connect(self.load_texture_0)
+        self.centralWidget().texture1.clicked.connect(self.load_texture_1)
         self.runner = None
 
 
@@ -62,7 +65,7 @@ class ShaderPlayground(QMainWindow):
         handle = self.centralWidget().splitter.handle(1)
         layout = QHBoxLayout(handle)
         layout.setSpacing(0)
-        layout.setMargin(0)
+        #layout.setMargin(0)
         for i in range (0, 2):
             line = QFrame(handle)
             line.setFrameShape(QFrame.VLine)
@@ -131,19 +134,29 @@ class ShaderPlayground(QMainWindow):
             modifier = float(value) / 10.0
         self.opengl.set_animation_speed_modifier(modifier)
     
-    def set_texture_0(self, channel: int, filename: str):
+    @Slot()
+    def set_texture(self, channel: int, filename: str):
         """ Set texture to a given filename. """
         if filename != "":
             self.opengl.set_texture(channel, filename)
             if channel == 0:
-                self.centralWidget().texture0.set_image(filename)
+                self.centralWidget().texture0.set_image_from_pixmap(self.opengl.get_texture_thumbnail(channel))
+            elif channel == 1:
+                self.centralWidget().texture1.set_image_from_pixmap(self.opengl.get_texture_thumbnail(channel))
 
     @Slot()
     def load_texture_0(self):
         """ Let user select a texture nr 0. """
-        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg)")
+        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav)")
         if filename[0] != "":
-            self.set_texture_0(0, filename[0])
+            self.set_texture(0, filename[0])
+
+    @Slot()
+    def load_texture_1(self):
+        """ Let user select a texture nr 1. """
+        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav)")
+        if filename[0] != "":
+            self.set_texture(1, filename[0])
 
     @Slot()
     def save_image(self):
@@ -153,7 +166,7 @@ class ShaderPlayground(QMainWindow):
         if filename[0] != "":
             resolution_dialog = QDialog(self)
             ui_loader = QUiLoader()
-            ui_file = QFile("PyShaderPlayground/ResolutionDialog.ui")
+            ui_file = QFile(path.abspath(path.join(path.dirname(__file__), 'ResolutionDialog.ui')))
             ui_file.open(QIODevice.ReadOnly)
             resolution_dialog.Form = ui_loader.load(ui_file, resolution_dialog)
             ui_file.close()
@@ -294,14 +307,14 @@ class ImageThumbnail(QLabel):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.filename = "Empty"
-        self.set_image(self.filename)
+        self.filename = 'None'
+        self.set_image_from_file(self.filename)
 
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(self, event): # pylint: disable=invalid-name
         """ React on mouse released event. """
         self.clicked.emit()
 
-    def set_image(self, filename):
+    def set_image_from_file(self, filename: str):
         """ Set the thumbnail. """
         pixmap = None
         file = Path(filename)
@@ -311,6 +324,10 @@ class ImageThumbnail(QLabel):
         else:
             pixmap = QPixmap(100, 100)
             pixmap.fill(Qt.black)
-            self.filename = "Empty"
+            self.filename = 'None'
         self.setPixmap(pixmap)
         self.setToolTip(self.filename)
+
+    def set_image_from_pixmap(self, pixmap: QPixmap):
+        """ Set the thumbnail. """
+        self.setPixmap(pixmap)

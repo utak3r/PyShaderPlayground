@@ -1,19 +1,23 @@
-from PySide2.QtWidgets import QOpenGLWidget, QMessageBox
-from PySide2.QtGui import QOpenGLShader, QOpenGLShaderProgram, QSurfaceFormat, QOpenGLFramebufferObject, QImage, QOpenGLTexture
 from OpenGL import GL as gl
-from PySide2.QtCore import QTimer
+from PySide6.QtWidgets import QMessageBox
+from PySide6.QtOpenGLWidgets import QOpenGLWidget
+from PySide6.QtGui import QSurfaceFormat, QOpenGLFunctions, QImage
+from PySide6.QtOpenGL import QOpenGLShader, QOpenGLShaderProgram, QOpenGLFramebufferObject, QOpenGLTexture
+from PySide6.QtCore import QTimer
 import os
+from pathlib import Path
+from PyShaderPlayground.ShaderPlaygroundInputs import InputTexture, InputTexture2D, InputTextureSound
 
-class ShaderWidget(QOpenGLWidget):
+class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
     def __init__(self, parent=None):
-        super().__init__(parent)
+        QOpenGLWidget.__init__(self, parent)
+        QOpenGLFunctions.__init__(self)
 
-        # Setting up modern OpenGL format
-        OpenGL_format = QSurfaceFormat()
-        # OpenGL_format.setDepthBufferSize(24)
-        # OpenGL_format.setStencilBufferSize(8)
-        OpenGL_format.setVersion(1, 2)
-        OpenGL_format.setProfile(QSurfaceFormat.CoreProfile)
+        OpenGL_format = QSurfaceFormat.defaultFormat()
+        OpenGL_format.setProfile(QSurfaceFormat.defaultFormat().profile())
+        #OpenGL_format.setVersion(3, 1)
+        OpenGL_format.setDepthBufferSize(24)
+        OpenGL_format.setStencilBufferSize(8)
         QSurfaceFormat.setDefaultFormat(OpenGL_format)
 
         self.width_ = self.width()
@@ -27,7 +31,9 @@ class ShaderWidget(QOpenGLWidget):
         self.uniform_iMouse = None
         self.uniform_iGlobalTime = None
         self.uniform_iChannel0 = None
-        self.texture_0_ = None
+        self.uniform_iChannel1 = None
+        self.texture_0_ = InputTexture()
+        self.texture_1_ = InputTexture()
         self.global_time: float = 0.0
         self.mouse = [0.0, 0.0, 0.0, 0.0]
         self.framerate_ = 50
@@ -110,12 +116,13 @@ class ShaderWidget(QOpenGLWidget):
 
     def initializeGL(self):
         """ Initialize OpenGL and related things. """
-        func = self.context().functions()
-        print(func.glGetString(gl.GL_RENDERER) + " OpenGL " + func.glGetString(gl.GL_VERSION))
+        self.initializeOpenGLFunctions()
+        #func = self.context().functions()
+        #print(func.glGetString(gl.GL_RENDERER) + " OpenGL " + func.glGetString(gl.GL_VERSION))
 
         self.shader_vertex_ = QOpenGLShader(QOpenGLShader.Vertex)
         self.shader_vertex_.compileSourceCode(
-            "#version 130\n" +
+            "#version 150\n" +
             "attribute vec3 position;\n" +
             "void main()\n" +
             "{\n" +
@@ -125,11 +132,12 @@ class ShaderWidget(QOpenGLWidget):
         self.shader_fragment_ = QOpenGLShader(QOpenGLShader.Fragment)
 
         self.shader_template_pre_ = \
-            "#version 130\n" \
+            "#version 150\n" \
             "uniform vec3 iResolution;				// The viewport resolution (z is pixel aspect ratio, usually 1.0)\n" \
             "uniform vec2 iGlobalTime;				// shader playback time (in seconds)\n" \
             "uniform vec4 iMouse;                   // mouse pixel coords. xy: current (if MLB down), zw: click\n" \
             "uniform sampler2D iChannel0;			// Sampler for input texture\n" \
+            "uniform sampler2D iChannel1;			// Sampler for input texture\n" \
             "float iTime = iGlobalTime.x;\n" \
             "\n "
         self.shader_template_post_ = \
@@ -159,6 +167,7 @@ class ShaderWidget(QOpenGLWidget):
         self.uniform_iResolution = self.program_.uniformLocation("iResolution")
         self.uniform_iMouse = self.program_.uniformLocation("iMouse")
         self.uniform_iChannel0 = self.program_.uniformLocation("iChannel0")
+        self.uniform_iChannel1 = self.program_.uniformLocation("iChannel1")
 
         self.program_.release()
 
@@ -171,6 +180,9 @@ class ShaderWidget(QOpenGLWidget):
         self.shader_user_ = user_shader
         if not self.shader_fragment_.compileSourceCode(self.shader_template_pre_ + self.shader_user_ + self.shader_template_post_):
             log = self.shader_fragment_.log()
+            # for debug:
+            with open('fragment_shader.temp.glsl', 'w') as f:
+                f.write(self.shader_fragment_.sourceCode().toStdString())
             QMessageBox.critical(self, "Shader compile problem", log, QMessageBox.Ok)
         else:
             self.program_.removeAllShaders()
@@ -184,6 +196,7 @@ class ShaderWidget(QOpenGLWidget):
             self.uniform_iResolution = self.program_.uniformLocation("iResolution")
             self.uniform_iMouse = self.program_.uniformLocation("iMouse")
             self.uniform_iChannel0 = self.program_.uniformLocation("iChannel0")
+            self.uniform_iChannel1 = self.program_.uniformLocation("iChannel1")
 
         self.timer_.start()
         self.program_.release()
@@ -199,37 +212,42 @@ class ShaderWidget(QOpenGLWidget):
         """ Resize OGL window. """
         self.width_ = width
         self.height_ = height
-        func = self.context().functions()
-        func.glViewport(0, 0, self.width_, self.height_)
+        #func = self.context().functions()
+        self.glViewport(0, 0, self.width_, self.height_)
 
 
     def paintGL(self):
         """ Paint it! """
-        func = self.context().functions()
-        func.glClearColor(0.0, 0.0, 0.0, 1.0)
-        func.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+        #func = self.context().functions()
+        self.glClearColor(0.0, 0.0, 0.0, 1.0)
+        self.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
 
-        func.glFrontFace(gl.GL_CW)
-        func.glCullFace(gl.GL_FRONT)
-        func.glEnable(gl.GL_CULL_FACE)
-        func.glEnable(gl.GL_DEPTH_TEST)
+        self.glFrontFace(gl.GL_CW)
+        self.glCullFace(gl.GL_FRONT)
+        self.glEnable(gl.GL_CULL_FACE)
+        self.glEnable(gl.GL_DEPTH_TEST)
 
         self.program_.bind()
         self.program_.setUniformValue(self.uniform_iGlobalTime, self.global_time, 0.0)
         self.program_.setUniformValue(self.uniform_iResolution, float(self.width_), float(self.height_), 0.0)
-        self.program_.setUniformValue(self.uniform_iMouse, self.mouse[0], self.mouse[1], self.mouse[2], self.mouse[3])
-        if self.texture_0_ is not None:
-            self.texture_0_.bind()
+        self.program_.setUniformValue(self.uniform_iMouse, self.mouse[0], self.mouse[1], self.mouse[2], self.mouse[3])        
+        self.texture_0_.set_position(self.global_time)
+        if self.texture_0_.can_be_binded():
+            self.texture_0_.get_texture().bind()
         self.program_.setUniformValue(self.uniform_iChannel0, int(0))
+        self.texture_1_.set_position(self.global_time)
+        if self.texture_1_.can_be_binded():
+            self.texture_1_.get_texture().bind()
+        self.program_.setUniformValue(self.uniform_iChannel1, int(1))
 
         self.program_.setAttributeArray(self.attrib_position, self.vertices_, 2, 0)
-        func.glEnableVertexAttribArray(self.attrib_position)
-        func.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
-        func.glDisableVertexAttribArray(self.attrib_position)
+        self.glEnableVertexAttribArray(self.attrib_position)
+        self.glDrawArrays(gl.GL_TRIANGLE_STRIP, 0, 4)
+        self.glDisableVertexAttribArray(self.attrib_position)
 
         self.program_.release()
-        func.glDisable(gl.GL_DEPTH_TEST)
-        func.glDisable(gl.GL_CULL_FACE)
+        self.glDisable(gl.GL_DEPTH_TEST)
+        self.glDisable(gl.GL_CULL_FACE)
         self.update()
 
 
@@ -242,17 +260,28 @@ class ShaderWidget(QOpenGLWidget):
         # save screen rendering size
         orig_width = self.width_
         orig_height = self.height_
+        # Ok, here's the thing...
+        # Without below current screen buffer grab...
+        # following FBO doesn't work as expected??!
+        # WTF...
+        fbImage = self.grabFramebuffer()
+        #fbImage.save(f'{name}_screenbuffer.{ext}', img_type, 95)
         # create an offscreen frame buffer
         buffer = QOpenGLFramebufferObject(width, height)
-        buffer.bind()
-        self.resizeGL(width, height)
-        self.paintGL()
-        # save image
-        image = buffer.toImage()
-        image.save(filename, img_type, 90)
-        # restore screen rendering
-        buffer.release()
-        self.resizeGL(orig_width, orig_height)
+        if buffer.bind():
+            self.resizeGL(width, height)
+            self.paintGL()
+            # save image
+            fboImage = buffer.toImage()
+            #fboImage.save(f'{name}_unpremultiplied.{ext}', img_type, 95)
+            # deal with unpremultiplied image
+            image = QImage(fboImage.constBits(), fboImage.width(), fboImage.height(), QImage.Format.Format_ARGB32)
+            image.save(filename, img_type, 95)
+            # restore screen rendering
+            buffer.release()
+            self.resizeGL(orig_width, orig_height)
+        else:
+            print("ShaderWidget.render_image: Unable to switch rendering from screen to FBO.")
 
 
     @staticmethod
@@ -273,7 +302,34 @@ class ShaderWidget(QOpenGLWidget):
         """ Set texture nr 0 from given filename. """
         if channel == 0:
             if self.isValid():
-                self.texture_0_ = ShaderWidget.make_texture(image)
+                file_ext = Path(image).suffix
+                if file_ext.casefold() == ".jpg" or file_ext.casefold() == ".png":
+                    self.texture_0_ = InputTexture2D(image)
+                elif file_ext.casefold() == ".wav":
+                    self.texture_0_ = InputTextureSound(image)
+        elif channel == 1:
+            if self.isValid():
+                file_ext = Path(image).suffix
+                if file_ext.casefold() == ".jpg" or file_ext.casefold() == ".png":
+                    self.texture_1_ = InputTexture2D(image)
+                elif file_ext.casefold() == ".wav":
+                    self.texture_1_ = InputTextureSound(image)
+
+    def get_texture(self, channel: int):
+        if channel == 0:
+            if self.isValid():
+                return self.texture_0_
+        elif channel == 1:
+            if self.isValid():
+                return self.texture_1_
+
+    def get_texture_thumbnail(self, channel: int):
+        if channel == 0:
+            if self.texture_0_ is not None:
+                return self.texture_0_.get_thumbnail()
+        elif channel == 1:
+            if self.texture_1_ is not None:
+                return self.texture_1_.get_thumbnail()
 
     @staticmethod
     def make_texture(image: str) -> QOpenGLTexture:
