@@ -260,6 +260,12 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         # save screen rendering size
         orig_width = self.width_
         orig_height = self.height_
+        # Ok, here's the thing...
+        # Without below current screen buffer grab...
+        # following FBO doesn't work as expected??!
+        # WTF...
+        fbImage = self.grabFramebuffer()
+        #fbImage.save(f'{name}_screenbuffer.{ext}', img_type, 95)
         # create an offscreen frame buffer
         buffer = QOpenGLFramebufferObject(width, height)
         if buffer.bind():
@@ -267,9 +273,9 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
             self.paintGL()
             # save image
             fboImage = buffer.toImage()
-            fboImage.save(f'{name}_unpremultiplied.{ext}', img_type, 95)
+            #fboImage.save(f'{name}_unpremultiplied.{ext}', img_type, 95)
             # deal with unpremultiplied image
-            image = QImage(fboImage.constBits(), fboImage.width(), fboImage.height(), QImage.Format_ARGB32)
+            image = QImage(fboImage.constBits(), fboImage.width(), fboImage.height(), QImage.Format.Format_ARGB32)
             image.save(filename, img_type, 95)
             # restore screen rendering
             buffer.release()
