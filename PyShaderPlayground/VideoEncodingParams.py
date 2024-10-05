@@ -2,12 +2,13 @@ from PySide6.QtWidgets import QDialog, QFileDialog
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QCoreApplication, Slot, QFile, QIODevice, QSettings, QFileInfo
 from enum import IntEnum
+from os import path
 
 class VideoEncodingParams(QDialog):
 
     def __init__(self, settings: QSettings, parent=None):
         super().__init__(parent)
-        self.init_ui("PyShaderPlayground/VideoEncodingParams.ui")
+        self.init_ui(path.abspath(path.join(path.dirname(__file__), 'VideoEncodingParams.ui')))
 
         self.settings = settings
 
