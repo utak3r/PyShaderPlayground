@@ -7,11 +7,12 @@ from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
 from pathlib import Path
 from PyShaderPlayground.process_tools import ProcessRunner
 from PyShaderPlayground.VideoEncodingParams import VideoEncodingParams
+from os import path
 
 class ShaderPlayground(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
-        self.init_ui("PyShaderPlayground/ShaderPlayground.ui")
+        self.init_ui(path.abspath(path.join(path.dirname(__file__), 'ShaderPlayground.ui')))
         self.opengl = self.centralWidget().player
         self.syntax_highlighter = GLSLSyntaxHighlighter(self.centralWidget().txtShaderEditor.document())
 
@@ -165,7 +166,7 @@ class ShaderPlayground(QMainWindow):
         if filename[0] != "":
             resolution_dialog = QDialog(self)
             ui_loader = QUiLoader()
-            ui_file = QFile("PyShaderPlayground/ResolutionDialog.ui")
+            ui_file = QFile(path.abspath(path.join(path.dirname(__file__), 'ResolutionDialog.ui')))
             ui_file.open(QIODevice.ReadOnly)
             resolution_dialog.Form = ui_loader.load(ui_file, resolution_dialog)
             ui_file.close()

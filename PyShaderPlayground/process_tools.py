@@ -2,12 +2,13 @@ import asyncio
 from PySide6.QtWidgets import QDialog
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QCoreApplication, Slot, QFile, QIODevice
+from os import path
 
 class ProcessRunner(QDialog):
     """ Running a shell command with stdout and stderr output in a text window. """
     def __init__(self):
         QDialog.__init__(self)
-        self.init_ui("PyShaderPlayground/ProcessRunner.ui")
+        self.init_ui(path.abspath(path.join(path.dirname(__file__), 'ProcessRunner.ui')))
 
         self.process = None
         self.Form.btnOk.clicked.connect(self.accept)
