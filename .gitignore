@@ -2,3 +2,8 @@
 */__pycache__/
 /build/
 /dist/
+/releases/
+ShaderPlayground.ini
+*.mp4
+*.png
+*.jpg
