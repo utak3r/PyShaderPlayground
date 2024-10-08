@@ -50,9 +50,10 @@ class ProcessRunner(QDialog):
         """ Create a subprocess and let read_stream method to read its output. Change the dialog's buttons states. """
         self.Form.btnOk.setEnabled(False)
         try:
-            self.process = await asyncio.create_subprocess_shell(command, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            self.process = await asyncio.create_subprocess_shell(command, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
             self.Form.btnCancel.setEnabled(True)
-            await asyncio.wait([self.read_stream(self.process.stdout), self.read_stream(self.process.stderr)])
+            async with asyncio.TaskGroup() as tg:
+                read_task = tg.create_task(self.read_stream(self.process.stdout))
         finally:
             self.Form.btnCancel.setEnabled(False)
             self.Form.btnOk.setEnabled(True)
