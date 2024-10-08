@@ -305,14 +305,14 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
                 file_ext = Path(image).suffix
                 if file_ext.casefold() == ".jpg" or file_ext.casefold() == ".png":
                     self.texture_0_ = InputTexture2D(image)
-                elif file_ext.casefold() == ".wav":
+                elif file_ext.casefold() == ".wav" or file_ext.casefold() == ".mp3":
                     self.texture_0_ = InputTextureSound(image)
         elif channel == 1:
             if self.isValid():
                 file_ext = Path(image).suffix
                 if file_ext.casefold() == ".jpg" or file_ext.casefold() == ".png":
                     self.texture_1_ = InputTexture2D(image)
-                elif file_ext.casefold() == ".wav":
+                elif file_ext.casefold() == ".wav" or file_ext.casefold() == ".mp3":
                     self.texture_1_ = InputTextureSound(image)
 
     def get_texture(self, channel: int):

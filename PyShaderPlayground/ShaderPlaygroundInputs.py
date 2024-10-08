@@ -12,6 +12,9 @@ from matplotlib.figure import Figure
 from matplotlib import colors as clrs
 from skimage.transform import resize
 from skimage import exposure
+import skimage.io
+import librosa
+from PIL import Image
 
 
 class TextureFilter(Enum):
@@ -99,45 +102,71 @@ class InputTextureSound(InputTexture):
         self.max_sample_value_ = 0
         self.current_frame_ = 0
         self.thumbnail_ = None
-        self.colormap_ = InputTextureSound.create_color_map()
+        #self.colormap_ = InputTextureSound.create_color_map()
         self.create_texture(filename)
 
     @staticmethod
-    def create_color_map():
-        reds = plt.get_cmap('Reds', 256)
-        black_reds = reds(np.linspace(0, 1, 256))
-        for i in range(256):
-            black_reds[i:i+1, :] = np.array([i/256, 0, 0, 1])
-        map_black_reds = clrs.ListedColormap(black_reds)
-        return map_black_reds
+    def array_to_red_image(array) -> Image:
+        """Makes an image from NDArray. Array values are transferred into R channel of RGB."""
+        img = None
+        # grey image from array
+        img = Image.fromarray(array, mode='L')
+        # empty grey image of the same size
+        zero = np.zeros(array.shape, dtype=np.uint8)
+        img_zero = Image.fromarray(zero, mode='L')
+        # merge it. Real image goes to R channel, while G and B channels filled with zeroes
+        img = Image.merge(mode='RGB', bands=(img, img_zero, img_zero))
+        return img
+    
+    @staticmethod
+    def scale_minmax(X, min=0.0, max=1.0):
+        X_std = (X - X.min()) / (X.max() - X.min())
+        X_scaled = X_std * (max - min) + min
+        return X_scaled
+
 
     def create_texture(self, filename: str):
         super().create_texture()
         self.filename_ = filename
-        self.sample_rate_, self.audio_ = wav.read(self.filename_)
+        # we're converting any input into predefined sample rate
+        INPUT_SAMPLE_RATE = 22500
+        self.audio_, self.sample_rate_ = librosa.load(self.filename_, sr=INPUT_SAMPLE_RATE)
         if self.audio_.ndim > 1:
             self.audio_ = np.mean(self.audio_, axis=1) # we want mono!
         num_samples = self.audio_.shape[0]
         self.length_ = num_samples / self.sample_rate_
         self.max_sample_value_ = np.max(self.audio_)
 
-        fig=plt.figure(figsize=(1.0, 1.0), dpi=100)
-        canvas = FigureCanvas(fig)
-        ax = plt.axes()
-        ax.set_axis_off()
-        ax.margins(0)
-        ax.plot(np.arange(num_samples) / self.sample_rate_, self.audio_)
-        fig.tight_layout()
-        thumb_file = f"{self.filename_}_thumbnail_temp.png"
+        audio_part_img = exposure.rescale_intensity(self.audio_, out_range=(-1.0, 1.0))
+        audio_wave_img = self.array_to_red_image(audio_part_img)
+        audio_wave_img = audio_wave_img.rotate(-90, expand=True)
+        audio_wave_img = audio_wave_img.resize((100,100))
+        img = QImage(audio_wave_img.tobytes(), 100, 100, 100*3, QImage.Format_RGB888)
+        self.thumbnail_ = QPixmap(img)
 
-        canvas.draw()
-        img = np.fromstring(canvas.tostring_rgb(), dtype='uint8').reshape(100, 100, 3)
-        img2 = QImage(img.data, 100, 100, QImage.Format_Indexed8)
+        # waveform = librosa.display.waveshow(self.audio_, sr=self.sample_rate_)
+        # img = self.scale_minmax(waveform, 0, 255).astype(np.uint8)
+        # img = img.resize((100,100))
+        # img2 = QImage(img.data, 100, 100, QImage.Format_Indexed8)
+        # self.thumbnail_ = QPixmap(img2)
+
+        # fig=plt.figure(figsize=(1.0, 1.0), dpi=100)
+        # canvas = FigureCanvas(fig)
+        # ax = plt.axes()
+        # ax.set_axis_off()
+        # ax.margins(0)
+        # ax.plot(np.arange(num_samples) / self.sample_rate_, self.audio_)
+        # fig.tight_layout()
+        # thumb_file = f"{self.filename_}_thumbnail_temp.png"
+
+        # canvas.draw()
+        # img = np.fromstring(canvas.tostring_rgb(), dtype='uint8').reshape(100, 100, 3)
+        # img2 = QImage(img.data, 100, 100, QImage.Format_Indexed8)
 
         #plt.savefig(thumb_file, dpi=fig.dpi)
-        plt.close(fig)
+        #plt.close(fig)
         #self.thumbnail_ = QPixmap(QImage(thumb_file))
-        self.thumbnail_ = QPixmap(img2)
+        #self.thumbnail_ = QPixmap(img2)
         #Path(thumb_file).unlink()
         self.texture_.setData(self.prepare_texture(0.0))
 
@@ -149,54 +178,29 @@ class InputTextureSound(InputTexture):
         T = 1.0 / self.sample_rate_
         audio_part = self.audio_[sample_start:sample_end]
 
-        fig=plt.figure(figsize=(5.12, 0.02), dpi=100)
-        fig.subplots_adjust(hspace=0)
-        fig.tight_layout()
-        axes=[]
-        axes.append(fig.add_subplot(2, 1, 1))
-        axes[0].set_axis_off()
-        axes[0].margins(0)
-        axes.append(fig.add_subplot(2, 1, 2))
-        axes[1].set_axis_off()
-        axes[1].margins(0)
+        audio_part_img = exposure.rescale_intensity(audio_part, out_range=(-1.0, 1.0))
+        audio_wave_img = self.array_to_red_image(audio_part_img)
+        audio_wave_img = audio_wave_img.rotate(-90, expand=True)
+        audio_wave_img = audio_wave_img.resize((1024,512))
 
-        Pxx, freqs, bins, im0 = axes[0].specgram(audio_part, Fs=self.framerate_, NFFT=1024, cmap=self.colormap_)
-        image0 = im0.make_image(plt.gcf().canvas.get_renderer())
-        image0 = np.array(image0, dtype=np.uint8)
-        h, w = image0.shape
-        texture = QImage(image0.data, h, w, 3*h, QImage.Format_RGB888)
-        texture.save("texture_test.jpg")
+        n_fft = int(N)
+        mel_spect = librosa.feature.melspectrogram(y=audio_part, sr=self.sample_rate_, n_fft=n_fft, hop_length=n_fft)
+        mel_spect = librosa.power_to_db(mel_spect, ref=np.max)
+        melspect_img = self.array_to_red_image(mel_spect)
+        melspect_img = melspect_img.crop((0, 0, 1, melspect_img.size[1]))
+        melspect_img = melspect_img.rotate(-90, expand=True)
+        spectrogram_image = melspect_img.resize((1024,512))
 
-        # spectrum = fft(audio_part, axis=0)
-        # spectrum = np.abs(spectrum[:N//2])
+        width_spec, height_spec = spectrogram_image.size
+        width_wave, height_wave = audio_wave_img.size
 
-        # audio_part_img = exposure.rescale_intensity(audio_part, out_range=(-1.0, 1.0))
-        # audio_part_img = np.expand_dims(audio_part_img, axis=0)
-        # audio_part_img = resize(audio_part_img, (1, 512), anti_aliasing=True)
+        final_img = Image.new('RGB', size=(width_spec,height_spec+height_wave))
+        final_img.paste(spectrogram_image, (0, 0))
+        final_img.paste(audio_wave_img, (0, height_spec))
+        final_width, final_height = final_img.size
 
-        # spectrum_img = exposure.rescale_intensity(spectrum, out_range=(0, 100))
-        # spectrum_img = np.expand_dims(spectrum_img, axis=0)
-        # spectrum_img = resize(spectrum_img, (1, 512), anti_aliasing=True)
-
-        # fig=plt.figure(figsize=(5.12, 0.02), dpi=100)
-        # fig.subplots_adjust(hspace=0)
-        # fig.tight_layout()
-        # axes=[]
-        # axes.append(fig.add_subplot(2, 1, 1))
-        # axes[0].set_axis_off()
-        # axes[0].margins(0)
-        # axes.append(fig.add_subplot(2, 1, 2))
-        # axes[1].set_axis_off()
-        # axes[1].margins(0)
-
-        # axes[0].imshow(spectrum_img, cmap=self.colormap_)
-        # axes[1].imshow(audio_part_img, cmap=self.colormap_)
-
-        # texture_file = f"{self.filename_}_texture_frame_{current_frame}_temp.png"
-        # plt.savefig(texture_file, dpi=fig.dpi)
-        # texture = QImage(texture_file).mirrored(False, False)
-        # Path(texture_file).unlink()
-        # plt.close(fig)
+        texture = QImage(final_img.tobytes(), final_width, final_height, final_width*3, QImage.Format_RGB888)
+        #texture.save('final_texture.jpg')
         return texture
 
     def set_position(self, position: float):

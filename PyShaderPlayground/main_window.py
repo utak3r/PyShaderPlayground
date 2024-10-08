@@ -147,14 +147,14 @@ class ShaderPlayground(QMainWindow):
     @Slot()
     def load_texture_0(self):
         """ Let user select a texture nr 0. """
-        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav)")
+        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav *.mp3)")
         if filename[0] != "":
             self.set_texture(0, filename[0])
 
     @Slot()
     def load_texture_1(self):
         """ Let user select a texture nr 1. """
-        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav)")
+        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav *.mp3)")
         if filename[0] != "":
             self.set_texture(1, filename[0])
 
