@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build EXE",
+            "type": "shell",
+            "command": "pyinstaller --clean PyShaderPlayground.spec",
+            "group": "build"
+        },
+        {
+            "label": "Jupyter notebooks to MarkDown",
+            "type": "shell",
+            "command": "jupyter nbconvert ./experiments/sound_analysis.ipynb --to markdown",
+            "group": "build"
+        }
+    ]
+
+
+    
+}
