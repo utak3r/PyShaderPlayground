@@ -196,7 +196,7 @@ class InputTextureSound(InputTexture):
 
     def prepare_texture(self, position: float):
         current_frame = int(position*self.framerate_)
-        sample_start = int(current_frame / self.framerate_ * self.sample_rate_)
+        sample_start = int(position * self.sample_rate_)
         sample_end = int((current_frame + 1) / self.framerate_ * self.sample_rate_)
         N = sample_end - sample_start
         T = 1.0 / self.sample_rate_

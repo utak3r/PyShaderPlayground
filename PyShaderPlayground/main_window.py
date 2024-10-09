@@ -231,10 +231,12 @@ class ShaderPlayground(QMainWindow):
                 ffmpeg = "\"" + params_dialog.get_ffmpeg() + "\""
                 codec = params_dialog.get_codec()
                 # render frames
+                orig_framerate = self.opengl.animation_framerate()
                 self.opengl.animation_stop()
                 render_progress_dlg = QProgressDialog("Rendering frames...", "Abort rendering", 0, frames, self)
                 render_progress_dlg.setWindowModality(Qt.WindowModal)
                 was_canceled = False
+                self.opengl.set_animation_speed(1.0, framerate)
                 for frame in range (frames):
                     render_progress_dlg.setValue(frame)
                     if render_progress_dlg.wasCanceled():
@@ -251,6 +253,7 @@ class ShaderPlayground(QMainWindow):
                 # remove temp files and dir
                 ShaderPlayground.remove_dir(temp_dir)
                 # resume playing
+                self.opengl.set_animation_speed(1.0, orig_framerate)
                 self.opengl.animation_play()
 
     @staticmethod
