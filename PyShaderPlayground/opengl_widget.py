@@ -233,11 +233,11 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         self.program_.setUniformValue(self.uniform_iMouse, self.mouse[0], self.mouse[1], self.mouse[2], self.mouse[3])        
         self.texture_0_.set_position(self.global_time)
         if self.texture_0_.can_be_binded():
-            self.texture_0_.get_texture().bind()
+            self.texture_0_.bind()
         self.program_.setUniformValue(self.uniform_iChannel0, int(0))
         self.texture_1_.set_position(self.global_time)
         if self.texture_1_.can_be_binded():
-            self.texture_1_.get_texture().bind()
+            self.texture_1_.bind()
         self.program_.setUniformValue(self.uniform_iChannel1, int(1))
 
         self.program_.setAttributeArray(self.attrib_position, self.vertices_, 2, 0)

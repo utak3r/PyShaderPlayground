@@ -16,6 +16,8 @@ import skimage.io
 import librosa
 from PIL import Image
 
+DEBUG_USE_SET_AUDIO_POSITION = False
+DEBUG_AUDIO_POSITION = 14.0
 
 class TextureFilter(Enum):
     """ Enum for texture filtering. """
@@ -50,6 +52,18 @@ class InputTexture():
         self.texture_.setMinificationFilter(self.filter_minification_.value)
         self.texture_.setMagnificationFilter(self.filter_magnification_.value)
         self.texture_.setWrapMode(self.wrapping_.value)
+    
+    def is_texture_created(self) -> bool:
+        created = False
+        if self.texture_:
+            if self.texture_.isCreated():
+                created = True
+        return created
+    
+    def destroy_texture(self):
+        if self.texture_:
+            if self.texture_.isCreated():
+                self.texture_.destroy()
 
     def get_thumbnail(self) -> QPixmap:
         pixmap = QPixmap(100, 100)
@@ -58,6 +72,15 @@ class InputTexture():
 
     def can_be_binded(self):
         return False
+
+    def bind(self):
+        self.get_texture().bind()
+    
+    def release(self):
+        self.get_texture().release()
+    
+    def is_bound(self) -> bool:
+        return self.get_texture().isBound()
 
     def set_position(self, position: float):
         return True
@@ -204,7 +227,13 @@ class InputTextureSound(InputTexture):
         return texture
 
     def set_position(self, position: float):
-        self.texture_.setData(self.prepare_texture(position))
+        if DEBUG_USE_SET_AUDIO_POSITION:
+            position = DEBUG_AUDIO_POSITION
+        if position is not self.current_position_:
+            if self.is_texture_created():
+                super().destroy_texture()
+                super().create_texture()
+            self.texture_.setData(self.prepare_texture(position))
 
     def get_thumbnail(self) -> QPixmap:
         pixmap = None
