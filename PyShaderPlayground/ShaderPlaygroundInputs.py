@@ -43,6 +43,7 @@ class InputTexture():
         self.filter_magnification_ = TextureFilter.FILTER_LINEAR
         self.wrapping_ = TextureWrapMode.WRAP_CLAMP_TO_EDGE
         self.filename_ = ""
+        self.current_position_ = 0
 
     def get_texture(self) -> QOpenGLTexture:
         return self.texture_
@@ -200,11 +201,12 @@ class InputTextureSound(InputTexture):
         N = sample_end - sample_start
         T = 1.0 / self.sample_rate_
         audio_part = self.audio_[sample_start:sample_end]
+        self.current_frame_ = current_frame
 
         audio_part_img = exposure.rescale_intensity(audio_part, out_range=(-1.0, 1.0))
         audio_wave_img = self.array_to_red_image(audio_part_img)
         audio_wave_img = audio_wave_img.rotate(-90, expand=True)
-        audio_wave_img = audio_wave_img.resize((1024,512))
+        audio_wave_img = audio_wave_img.resize((512,1))
 
         n_fft = int(N)
         mel_spect = librosa.feature.melspectrogram(y=audio_part, sr=self.sample_rate_, n_fft=n_fft, hop_length=n_fft)
@@ -212,7 +214,7 @@ class InputTextureSound(InputTexture):
         melspect_img = self.array_to_red_image(mel_spect)
         melspect_img = melspect_img.crop((0, 0, 1, melspect_img.size[1]))
         melspect_img = melspect_img.rotate(-90, expand=True)
-        spectrogram_image = melspect_img.resize((1024,512))
+        spectrogram_image = melspect_img.resize((512,1))
 
         width_spec, height_spec = spectrogram_image.size
         width_wave, height_wave = audio_wave_img.size

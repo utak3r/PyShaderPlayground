@@ -37,7 +37,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         self.global_time: float = 0.0
         self.mouse = [0.0, 0.0, 0.0, 0.0]
         self.framerate_ = 50
-        self.anim_speed_ = 2.0
+        self.anim_speed_ = 1.0
         self.anim_speed_modifier_ = 1.0
         self.shader_template_pre_ = ""
         self.shader_template_post_ = ""
@@ -59,7 +59,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
 
         self.timer_ = QTimer(self)
         self.timer_.timeout.connect(self.timer_tick)
-        self.set_animation_speed(2.0, 50)
+        self.set_animation_speed(1.0, 30)
         self.timer_.start()
 
     def set_animation_speed(self, speed: float=1.0, framerate: float=50):
@@ -70,7 +70,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
 
     def timer_tick(self):
         """ Increment self.global_time variable for animating. """
-        self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * self.framerate_ / 1000.0)
+        self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * (1.0 / self.framerate_))
 
     def animation_framerate(self):
         """ Returns current animation's framerate. """
@@ -108,11 +108,11 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         """ Temporary animation speed changing. """
         self.anim_speed_modifier_ = value
         if value != 1.0 and not self.is_playing():
-            self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * self.framerate_ / 1000.0)
+            self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * (1.0 / self.framerate_))
 
     def increment_animation(self, frames: int):
         """ Advance animation for given frames number. """
-        self.global_time = self.global_time + frames * (self.anim_speed_ * self.framerate_ / 1000.0)
+        self.global_time = self.global_time + frames * (self.anim_speed_ * (1.0 / self.framerate_))
 
     def initializeGL(self):
         """ Initialize OpenGL and related things. """
