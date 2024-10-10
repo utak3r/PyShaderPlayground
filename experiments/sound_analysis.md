@@ -9,16 +9,12 @@ Or maybe we should prepare one texture of the whole song, where on Y axis it'd h
 
 
 ```python
-from scipy.fftpack import fft, fftfreq
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
-from matplotlib import colors as clrs
-from skimage.transform import resize
-from skimage import exposure
-from scipy.signal.windows import gaussian
 import librosa
+import matplotlib.pyplot as plt
 from PIL import Image
+from skimage import exposure
+
 ```
 
 Ok, let's load some music
@@ -26,7 +22,7 @@ Ok, let's load some music
 
 ```python
 filename = 'test_sound_01.mp3'
-audio, sample_rate = librosa.load(filename, sr=44100)
+audio, sample_rate = librosa.load(filename, sr=22500)
 if audio.ndim > 1:
     audio = np.mean(audio, axis=1)
 num_samples = audio.shape[0]
@@ -36,17 +32,14 @@ max_sample_value = np.max(audio)
 print(f'Audio sample rate: {sample_rate}, number of samples: {num_samples}. Length: {length}, max sample value is: {max_sample_value}')
 ```
 
-    Audio sample rate: 44100, number of samples: 2526401. Length: 57.288004535147394, max sample value is: 0.8663547039031982
+    Audio sample rate: 22500, number of samples: 1288980. Length: 57.288, max sample value is: 0.889253556728363
     
 
 Let's draw simple waveform and frequency spectrum analysis:
 
 
 ```python
-plt.plot(audio);
-plt.title('Signal');
-plt.xlabel('Time (samples)');
-plt.ylabel('Amplitude');
+waveplot = librosa.display.waveshow(audio, sr=sample_rate)
 plt.show()
 
 n_fft = 2048
@@ -110,20 +103,6 @@ plt.show()
     
 
 
-Now we prepare the color map. It's using only a red color, so later,
-in our visualizations of audio signal, we will be checking only one channel of a texture.
-
-
-```python
-# prepare a red only colormap
-reds = plt.get_cmap('Reds', 256)
-black_reds = reds(np.linspace(0, 1, 256))
-for i in range(256):
-    black_reds[i:i+1, :] = np.array([i/256, 0, 0, 1])
-map_black_reds = clrs.ListedColormap(black_reds)
-colormap = map_black_reds
-```
-
 Let's start working on our texture. 
 We want it to be made of two parts: one for showing up the waveform of a short time window,
 and the another for showing up a mel spectrogram of the same window.
@@ -168,12 +147,12 @@ audio_wave_img = audio_wave_img.resize((1024,512))
 display(audio_wave_img)
 ```
 
-    Waveform size: 1470
+    Waveform size: 750
     
 
 
     
-![png](sound_analysis_files/sound_analysis_16_1.png)
+![png](sound_analysis_files/sound_analysis_14_1.png)
     
 
 
@@ -198,12 +177,12 @@ display(spectrogram_image)
 #spectrogram_image.save('spectrogram_array.png')
 ```
 
-    number of samples: 1470, n_FFT: 1470
+    number of samples: 750, n_FFT: 750
     
 
 
     
-![png](sound_analysis_files/sound_analysis_18_1.png)
+![png](sound_analysis_files/sound_analysis_16_1.png)
     
 
 
@@ -235,6 +214,6 @@ display(final_img)
 
 
     
-![png](sound_analysis_files/sound_analysis_20_1.png)
+![png](sound_analysis_files/sound_analysis_18_1.png)
     
 

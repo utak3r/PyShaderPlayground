@@ -10,7 +10,7 @@
         {
             "label": "Jupyter notebooks to MarkDown",
             "type": "shell",
-            "command": "jupyter nbconvert ./experiments/sound_analysis.ipynb --to markdown",
+            "command": "jupyter nbconvert ./experiments/*.ipynb --to markdown",
             "group": "build"
         }
     ]
