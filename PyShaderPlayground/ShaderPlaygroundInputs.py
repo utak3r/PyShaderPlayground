@@ -133,9 +133,19 @@ class InputTextureSound(InputTexture):
     def array_to_red_image(array) -> Image:
         """Makes an image from NDArray. Array values are transferred into R channel of RGB."""
         img = None
+        # get rid of imaginary data
+        array = array.real
+        # get absolute values
+        array = abs(array)
+        # get max value
+        max = np.max(array)
+        # normalize to 0.0 - 1.0 range
+        arrayuint8 = array.astype(np.float64) / max
+        # make it uint8 data
+        arrayuint8 = 255 * arrayuint8
         # grey image from array
-        img = Image.fromarray(array, mode='L')
-        # empty grey image of the same size
+        img = Image.fromarray(arrayuint8.astype(np.uint8), mode='L')
+        # empty grey image
         zero = np.zeros(array.shape, dtype=np.uint8)
         img_zero = Image.fromarray(zero, mode='L')
         # merge it. Real image goes to R channel, while G and B channels filled with zeroes
