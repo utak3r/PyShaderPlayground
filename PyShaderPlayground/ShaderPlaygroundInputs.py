@@ -5,6 +5,8 @@ from enum import Enum
 from pathlib import Path
 from scipy.io import wavfile as wav
 from scipy.fftpack import fft, fftfreq
+from scipy.fft import rfft
+from scipy.signal.windows import hann
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -122,7 +124,7 @@ class InputTextureSound(InputTexture):
         self.audio_ = None
         self.sample_rate_ = 1
         self.framerate_ = 1
-        self.length_ = 0
+        self.duration_ = 0
         self.max_sample_value_ = 0
         self.current_frame_ = 0
         self.thumbnail_ = None
@@ -151,6 +153,24 @@ class InputTextureSound(InputTexture):
         # merge it. Real image goes to R channel, while G and B channels filled with zeroes
         img = Image.merge(mode='RGB', bands=(img, img_zero, img_zero))
         return img
+
+    @staticmethod
+    def fft_filtered(signal):
+        """Calculates FFT of the real part of the signal and applies a Hann window"""
+        N = signal.shape[0]
+        w = hann(N) # Hann window
+        c_w = abs(sum(w))
+        fft = rfft(signal * w) / c_w 
+        return fft
+
+
+    @staticmethod
+    def fft_db(input):
+        """Calculates FFT of the real part of the signal and scales amplitudes to dB"""
+        fft = np.abs(np.fft.rfft(input))
+        fftdb = 20 * np.log10(fft)
+        return fftdb
+
     
     @staticmethod
     def scale_minmax(X, min=0.0, max=1.0):
@@ -162,52 +182,29 @@ class InputTextureSound(InputTexture):
     def create_texture(self, filename: str):
         super().create_texture()
         self.filename_ = filename
-        # we're converting any input into predefined sample rate
-        INPUT_SAMPLE_RATE = 22500
-        self.audio_, self.sample_rate_ = librosa.load(self.filename_, sr=INPUT_SAMPLE_RATE)
-        if self.audio_.ndim > 1:
-            self.audio_ = np.mean(self.audio_, axis=1) # we want mono!
+        # We're NOT resampling the source, leaving the original sample reate.
+        # Also, we're loading it as a mono sound.
+        INPUT_SAMPLE_RATE = None
+        self.audio_, self.sample_rate_ = librosa.load(self.filename_, mono=True, sr=INPUT_SAMPLE_RATE)
+        # if self.audio_.ndim > 1:
+        #     self.audio_ = np.mean(self.audio_, axis=1) # we want mono!
         num_samples = self.audio_.shape[0]
-        self.length_ = num_samples / self.sample_rate_
+        self.duration_ = num_samples / self.sample_rate_
         self.max_sample_value_ = np.max(self.audio_)
 
-        audio_part_img = exposure.rescale_intensity(self.audio_, out_range=(-1.0, 1.0))
-        audio_wave_img = self.array_to_red_image(audio_part_img)
+        audio_wave_img = self.array_to_red_image(self.audio_)
         audio_wave_img = audio_wave_img.rotate(-90, expand=True)
         audio_wave_img = audio_wave_img.resize((100,100))
         img = QImage(audio_wave_img.tobytes(), 100, 100, 100*3, QImage.Format_RGB888)
         self.thumbnail_ = QPixmap(img)
 
-        # waveform = librosa.display.waveshow(self.audio_, sr=self.sample_rate_)
-        # img = self.scale_minmax(waveform, 0, 255).astype(np.uint8)
-        # img = img.resize((100,100))
-        # img2 = QImage(img.data, 100, 100, QImage.Format_Indexed8)
-        # self.thumbnail_ = QPixmap(img2)
-
-        # fig=plt.figure(figsize=(1.0, 1.0), dpi=100)
-        # canvas = FigureCanvas(fig)
-        # ax = plt.axes()
-        # ax.set_axis_off()
-        # ax.margins(0)
-        # ax.plot(np.arange(num_samples) / self.sample_rate_, self.audio_)
-        # fig.tight_layout()
-        # thumb_file = f"{self.filename_}_thumbnail_temp.png"
-
-        # canvas.draw()
-        # img = np.fromstring(canvas.tostring_rgb(), dtype='uint8').reshape(100, 100, 3)
-        # img2 = QImage(img.data, 100, 100, QImage.Format_Indexed8)
-
-        #plt.savefig(thumb_file, dpi=fig.dpi)
-        #plt.close(fig)
-        #self.thumbnail_ = QPixmap(QImage(thumb_file))
-        #self.thumbnail_ = QPixmap(img2)
-        #Path(thumb_file).unlink()
         self.texture_.setData(self.prepare_texture(0.0))
 
     def prepare_texture(self, position: float):
         current_frame = int(position*self.framerate_)
+        samples_per_frame = int(self.sample_rate_ / self.framerate_)
         sample_start = int(position * self.sample_rate_)
-        sample_end = int((current_frame + 1) / self.framerate_ * self.sample_rate_)
+        sample_end = sample_start + samples_per_frame
         N = sample_end - sample_start
         T = 1.0 / self.sample_rate_
         audio_part = self.audio_[sample_start:sample_end]
@@ -215,16 +212,16 @@ class InputTextureSound(InputTexture):
 
         audio_part_img = exposure.rescale_intensity(audio_part, out_range=(-1.0, 1.0))
         audio_wave_img = self.array_to_red_image(audio_part_img)
-        audio_wave_img = audio_wave_img.rotate(-90, expand=True)
+        audio_wave_img = audio_wave_img.rotate(90, expand=True)
         audio_wave_img = audio_wave_img.resize((512,1))
 
-        n_fft = int(N)
-        mel_spect = librosa.feature.melspectrogram(y=audio_part, sr=self.sample_rate_, n_fft=n_fft, hop_length=n_fft)
-        mel_spect = librosa.power_to_db(mel_spect, ref=np.max)
-        melspect_img = self.array_to_red_image(mel_spect)
-        melspect_img = melspect_img.crop((0, 0, 1, melspect_img.size[1]))
-        melspect_img = melspect_img.rotate(-90, expand=True)
-        spectrogram_image = melspect_img.resize((512,1))
+        fft = self.fft_filtered(audio_part)
+        reduced_N = int(fft.shape[0]/2)
+        reduced_fft = fft[0:reduced_N]
+        fft_img = self.array_to_red_image(reduced_fft)
+        fft_img = fft_img.rotate(90, expand=True)
+        fft_img = fft_img.resize((512,1))
+        spectrogram_image = fft_img.resize((512,1))
 
         width_spec, height_spec = spectrogram_image.size
         width_wave, height_wave = audio_wave_img.size
@@ -241,11 +238,12 @@ class InputTextureSound(InputTexture):
     def set_position(self, position: float):
         if DEBUG_USE_SET_AUDIO_POSITION:
             position = DEBUG_AUDIO_POSITION
-        if position is not self.current_position_:
+        if position != self.current_position_:
             if self.is_texture_created():
                 super().destroy_texture()
                 super().create_texture()
             self.texture_.setData(self.prepare_texture(position))
+            self.current_position_ = position
 
     def get_thumbnail(self) -> QPixmap:
         pixmap = None
