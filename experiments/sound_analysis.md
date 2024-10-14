@@ -7,93 +7,127 @@ But, there's another thing to consider. The resulting texture.
 Should it be updated each frame and contain only that window? Time consuming, we could fall off off being real time.
 Or maybe we should prepare one texture of the whole song, where on Y axis it'd have FFT for a single frame, and frames would be put on X axis? Tat would be best, BUT - in case of our sampe 5mins long video it'd mean 18K length, that's not an option to load up as a texture into OpenGL...
 
+First, let's see different options for signal analysis.
+
 
 ```python
 import numpy as np
-import librosa
+
+sample_rate = 44100
+frequency = 440
+length = 1
+
+t = np.linspace(0, length, sample_rate * length)
+y = np.sin(frequency * 2 * np.pi * t)    
+simple_sine_wave_440Hz = y
+```
+
+
+```python
+from scipy import signal
+
+sampleRate = 44100
+frequency_start = 1000
+frequency_end = 8000
+length = 1
+
+t = np.linspace(0, length, sampleRate * length)
+y = signal.chirp(t, f0=frequency_start, f1=frequency_end, t1=length)
+m = np.max(np.abs(y))
+maxint16 = np.iinfo(np.int16).max
+y = maxint16 * y / m
+y = y.astype(np.int16) 
+freq_sweep_sine = y
+```
+
+
+```python
+sampleRate = 44100
+ts = 1.0 / sample_rate
+frequency_1 = 500
+frequency_2 = 3000
+frequency_3 = 6000
+frequency_4 = 10000
+length = 1
+
+t = np.linspace(0, length, sample_rate * length)
+y = np.sin(frequency_1 * 2 * np.pi * t)
+y += np.sin(frequency_2 * 2 * np.pi * t)
+y += np.sin(frequency_3 * 2 * np.pi * t)
+y += np.sin(frequency_4 * 2 * np.pi * t)
+
+multi_sine_4freqs = y
+```
+
+
+```python
+def get_audio_part(audio, time_start=0.0, sample_rate=44100, frame_rate=30, nframes = 1):
+    samples_per_frame = int(sample_rate / frame_rate)
+    sample_start = int(time_start * sample_rate)
+    sample_end = sample_start + (nframes * samples_per_frame)
+    N = sample_end - sample_start
+    T = 1.0 / sample_rate
+    t = np.linspace(0, nframes * (1.0 / frame_rate), int(sample_rate * nframes * (1.0 / frame_rate)))
+    audio_part = audio[sample_start:sample_end]
+    return (audio_part, N, T, t)
+```
+
+Simple FFT analysis
+
+
+```python
 import matplotlib.pyplot as plt
-from PIL import Image
-from skimage import exposure
+from scipy.fftpack import fft, ifft
 
-```
+signal, N, T, t = get_audio_part(multi_sine_4freqs, time_start=0.0, sample_rate=44100, frame_rate=30, nframes=1)
 
-Ok, let's load some music
+signal_fft = fft(signal)
+freq = t/T
 
+plt.figure(figsize = (10, 3))
 
-```python
-filename = 'test_sound_01.mp3'
-audio, sample_rate = librosa.load(filename, sr=22500)
-if audio.ndim > 1:
-    audio = np.mean(audio, axis=1)
-num_samples = audio.shape[0]
-length = num_samples / sample_rate
-max_sample_value = np.max(audio)
+plt.subplot(121)
+plt.plot(t, ifft(signal_fft), 'r')
+plt.xlabel('Time (s)')
+plt.ylabel('Amplitude')
 
-print(f'Audio sample rate: {sample_rate}, number of samples: {num_samples}. Length: {length}, max sample value is: {max_sample_value}')
-```
+plt.subplot(122)
+plt.stem(freq, np.abs(signal_fft), 'b', markerfmt=" ", basefmt="-b")
+plt.xlabel('Freq (Hz)')
+plt.ylabel('FFT Amplitude')
 
-    Audio sample rate: 22500, number of samples: 1288980. Length: 57.288, max sample value is: 0.889253556728363
-    
-
-Let's draw simple waveform and frequency spectrum analysis:
-
-
-```python
-waveplot = librosa.display.waveshow(audio, sr=sample_rate)
-plt.show()
-
-n_fft = 2048
-ft = np.abs(librosa.stft(audio[:n_fft], hop_length = n_fft+1))
-plt.plot(ft);
-plt.title('Spectrum');
-plt.xlabel('Frequency Bin');
-plt.ylabel('Amplitude');
+plt.tight_layout()
 plt.show()
 ```
 
-
-    
-![png](sound_analysis_files/sound_analysis_5_0.png)
-    
-
-
-
-    
-![png](sound_analysis_files/sound_analysis_5_1.png)
+    c:\Users\pito\.conda\envs\Python312PySide6\Lib\site-packages\matplotlib\cbook.py:1762: ComplexWarning: Casting complex values to real discards the imaginary part
+      return math.isfinite(val)
+    c:\Users\pito\.conda\envs\Python312PySide6\Lib\site-packages\matplotlib\cbook.py:1398: ComplexWarning: Casting complex values to real discards the imaginary part
+      return np.asarray(x, float)
     
 
 
-Now, let's see a full spectrogram of a whole loaded music. It's scaled in dB.
-Note: FFT (and short time FFT, too) gives both positive and negative results. 
-The sign here is unrelevant for us, we care only about the absolute value.
+    
+![png](sound_analysis_files/sound_analysis_7_1.png)
+    
+
+
+Let's get rid of the mirrored imaginary part of FFT.
 
 
 ```python
-spec = np.abs(librosa.stft(audio, hop_length=512))
-spec = librosa.amplitude_to_db(spec, ref=np.max)
-librosa.display.specshow(spec, sr=sample_rate, x_axis='time', y_axis='log');
-plt.colorbar(format='%+2.0f dB');
-plt.title('Spectrogram');
-plt.show()
-```
+signal, N, T, t = get_audio_part(multi_sine_4freqs, time_start=0.0, sample_rate=44100, frame_rate=30, nframes=1)
 
+signal_fft = fft(signal)
+freq = t/T
 
-    
-![png](sound_analysis_files/sound_analysis_7_0.png)
-    
+N_half = int(N/2)
+freqs_oneside = freq[0:N_half]
 
-
-Now...
-as humans do not perceive frequencies on a linear scale (we're detecting lower freqs much better than higher freqs), 
-we will use what is called a mel scale (proposed by Stevens, Volkmann, and Newmann back in 1937).
-
-
-```python
-mel_spect = librosa.feature.melspectrogram(y=audio, sr=sample_rate, n_fft=2048, hop_length=1024)
-mel_spect = librosa.power_to_db(mel_spect, ref=np.max)
-librosa.display.specshow(mel_spect, y_axis='mel', fmax=20000, x_axis='time');
-plt.title('Mel Spectrogram');
-plt.colorbar(format='%+2.0f dB');
+plt.figure(figsize = (8, 3))
+plt.plot(freqs_oneside, np.abs(signal_fft[:N_half]), 'b')
+plt.xlabel('Freq (Hz)')
+plt.ylabel('FFT Amplitude')
 plt.show()
 ```
 
@@ -103,29 +137,69 @@ plt.show()
     
 
 
-Let's start working on our texture. 
-We want it to be made of two parts: one for showing up the waveform of a short time window,
-and the another for showing up a mel spectrogram of the same window.
+Let's try to filter the amplitudes a bit.
+We will use a Hann window for this task.
 
 
 ```python
-frame_rate = 30.0 # framerate of a video
-current_time = 14.0 # in seconds
-current_frame = int(current_time * frame_rate)
-number_of_frames = 1
-sample_start = int((current_frame) / frame_rate * sample_rate)
-sample_end = int((current_frame + number_of_frames) / frame_rate * sample_rate)
-audio_part = audio[sample_start:sample_end]
+from scipy.signal.windows import hann
+from scipy.fft import fftfreq
+
+signal, N, T, t = get_audio_part(multi_sine_4freqs, time_start=0.0, sample_rate=44100, frame_rate=30, nframes=1)
+signal_fft = fft(signal)
+freq = t/T
+N_half = int(N/2)
+freqs_oneside = freq[:N_half]
+
+w = hann(N) # Hann window
+c_w = abs(sum(w))
+signal_fft_filtered = fft(signal * w) / c_w
+
+plt.figure(figsize = (10, 3))
+plt.subplot(121)
+plt.plot(freqs_oneside, np.abs(signal_fft[:N_half]), 'b')
+plt.xlabel('Freq (Hz)')
+plt.ylabel('FFT Amplitude')
+plt.subplot(122)
+plt.plot(freqs_oneside, np.abs(signal_fft_filtered[:N_half]), 'b')
+plt.xlabel('Freq (Hz)')
+plt.ylabel('FFT filtered Amplitude')
+plt.tight_layout()
+plt.show()
 ```
 
-The waveform part is easy and straightforward.
+
+    
+![png](sound_analysis_files/sound_analysis_11_0.png)
+    
+
+
+The last option looks like the best option for visualizing the amplitudes of frequencies.
+
+Nest step is the implementation. The big thing is ShaderToy has its own, very specific, and maybe not the best way of implementing this. That means as a first step we will do it in compliance with ShaderTy, but once we implement another feature in the app, which is individual settings for each loaded texture, we could also add other implementations.
+
+So, what exactly **ShaderToy** is saying about this texture?
+
+It's a **512x2** bitmap. First row is frequencies amplitudes. It is containing 48kHz/4 (**12kHz**) in those 512 texels - on a **linear** Hz scale.
+The second row of a texture is a sound wave.
 
 
 ```python
-def array_to_red_image(array):
+from PIL import Image
+
+def array_to_red_image(array) -> Image:
+    """Makes an image from NDArray. Array values are transferred into R channel of RGB."""
     img = None
+    # get absolute values
+    array = abs(array)
+    # get max value
+    max = np.max(array)
+    # normalize to 0.0 - 1.0 range
+    arrayuint8 = array.astype(np.float64) / max
+    # make it uint8 data
+    arrayuint8 = 255 * arrayuint8
     # grey image from array
-    img = Image.fromarray(array, mode='L')
+    img = Image.fromarray(arrayuint8.astype(np.uint8), mode='L')
     # empty grey image
     zero = np.zeros(array.shape, dtype=np.uint8)
     img_zero = Image.fromarray(zero, mode='L')
@@ -136,48 +210,30 @@ def array_to_red_image(array):
 
 
 ```python
-audio_part_img = exposure.rescale_intensity(audio_part, out_range=(-1.0, 1.0))
-print(f'Waveform size: {audio_part_img.size}')
-# convert to image
-audio_wave_img = array_to_red_image(audio_part_img)
-# rotate and resize
-audio_wave_img = audio_wave_img.rotate(-90, expand=True)
-audio_wave_img = audio_wave_img.resize((1024,512))
-#audio_wave_img.save('audiowave_array.png')
-display(audio_wave_img)
+signal, N, T, t = get_audio_part(multi_sine_4freqs, time_start=0.0, sample_rate=44100, frame_rate=30, nframes=1)
+
+w = hann(N) # Hann window
+c_w = abs(sum(w))
+signal_fft = fft(signal * w) / c_w
+print(f'Size of signal FFT: {signal_fft.size}')
+
+N_part = int(N/4)
+freq = t/T
+freqs_part = freq[:N_part]
+signal_fft_part = signal_fft[:N_part]
+
+plt.figure(figsize = (8, 3))
+plt.plot(freqs_part, np.abs(signal_fft_part), 'b')
+plt.show()
+
+fft_img = array_to_red_image(signal_fft_part)
+fft_img = fft_img.rotate(90, expand=True)
+fft_img = fft_img.resize((512,100))
+display(fft_img)
+
 ```
 
-    Waveform size: 750
-    
-
-
-    
-![png](sound_analysis_files/sound_analysis_14_1.png)
-    
-
-
-For a mel spectrogram, we will do some cropping, rotating etc. ;)
-
-
-```python
-number_of_samples = sample_end-sample_start
-n_fft = int(number_of_samples)
-print(f'number of samples: {number_of_samples}, n_FFT: {n_fft}')
-mel_spect = librosa.feature.melspectrogram(y=audio_part, sr=sample_rate, n_fft=n_fft, hop_length=n_fft)
-mel_spect = librosa.power_to_db(mel_spect, ref=np.max)
-melspect_img = array_to_red_image(mel_spect)
-
-# take first column
-melspect_img = melspect_img.crop((0, 0, 1, melspect_img.size[1]))
-# rotate and resize
-melspect_img = melspect_img.rotate(-90, expand=True)
-spectrogram_image = melspect_img.resize((1024,512))
-
-display(spectrogram_image)
-#spectrogram_image.save('spectrogram_array.png')
-```
-
-    number of samples: 750, n_FFT: 750
+    Size of signal FFT: 1470
     
 
 
@@ -186,34 +242,115 @@ display(spectrogram_image)
     
 
 
-So, we have all required parts to construct a final texture.
-Note: t was calculated for a current video frame, so it would have to be
-recalculated on each frame!
 
-We take both parts and concatenate into one square texture.
+    
+![png](sound_analysis_files/sound_analysis_16_2.png)
+    
+
+
+Let's collect both parts into one texture.
 
 
 ```python
-width_spec, height_spec = spectrogram_image.size
-width_wave, height_wave = audio_wave_img.size
-print(f'Img1 size: {width_spec}:{height_spec}')
-print(f'Img2 size: {width_wave}:{height_wave}')
-
-final_img = Image.new('RGB', size=(width_spec,height_spec+height_wave))
-final_img.paste(spectrogram_image, (0, 0))
-final_img.paste(audio_wave_img, (0, height_spec))
-final_img.save('final_texture.png')
-print(f'Final image size: {final_img.size}')
-display(final_img)
+def merge_images(img1: Image, img2: Image):
+    img = None
+    final_width = np.max([img1.size[0], img2.size[0]])
+    final_height = img1.size[1] + img2.size[1]
+    img = Image.new('RGB', size=(final_width, final_height))
+    img.paste(img1, (0, 0))
+    img.paste(img2, (0, img1.size[1]))
+    return img
 ```
 
-    Img1 size: 1024:512
-    Img2 size: 1024:512
-    Final image size: (1024, 1024)
-    
+
+```python
+signal, N, T, t = get_audio_part(multi_sine_4freqs, time_start=0.0, sample_rate=44100, frame_rate=30, nframes=1)
+
+wave_img = array_to_red_image(signal)
+wave_img = wave_img.rotate(90, expand=True)
+wave_img = wave_img.resize((512,50))
+
+w = hann(N) # Hann window
+c_w = abs(sum(w))
+signal_fft = fft(signal * w) / c_w
+N_part = int(N/4)
+signal_fft_part = signal_fft[:N_part]
+fft_img = array_to_red_image(signal_fft_part)
+fft_img = fft_img.rotate(90, expand=True)
+fft_img = fft_img.resize((512,50))
+
+final_img_100px = merge_images(fft_img, wave_img)
+display(final_img_100px)
+
+wave_img_1px = array_to_red_image(signal)
+wave_img_1px = wave_img_1px.rotate(90, expand=True)
+wave_img_1px = wave_img_1px.resize((512,1))
+fft_img_1px = array_to_red_image(signal_fft_part)
+fft_img_1px = fft_img_1px.rotate(90, expand=True)
+fft_img_1px = fft_img_1px.resize((512,1))
+
+final_img_1px = merge_images(fft_img_1px, wave_img_1px)
+display(final_img_1px)
+
+```
 
 
     
-![png](sound_analysis_files/sound_analysis_18_1.png)
+![png](sound_analysis_files/sound_analysis_19_0.png)
     
+
+
+
+    
+![png](sound_analysis_files/sound_analysis_19_1.png)
+    
+
+
+Test on some real music:
+
+
+```python
+import librosa
+audio, sample_rate = librosa.load('test_sound_01.mp3', mono=True, sr=44100)
+signal, N, T, t = get_audio_part(audio, time_start=45.0, sample_rate=sample_rate, frame_rate=30, nframes=1)
+wave_img = array_to_red_image(signal)
+wave_img = wave_img.rotate(90, expand=True)
+wave_img_100px = wave_img.resize((512,50))
+wave_img_1px = wave_img.resize((512,1))
+w = hann(N) # Hann window
+c_w = abs(sum(w))
+signal_fft = fft(signal * w) / c_w
+N_part = int(N/4)
+signal_fft_part = signal_fft[:N_part]
+fft_img = array_to_red_image(signal_fft_part)
+fft_img = fft_img.rotate(90, expand=True)
+fft_img_100px = fft_img.resize((512,50))
+fft_img_1px = fft_img.resize((512,1))
+final_img_100px = merge_images(fft_img_100px, wave_img_100px)
+final_img_1px = merge_images(fft_img_1px, wave_img_1px)
+display(final_img_100px)
+```
+
+
+    
+![png](sound_analysis_files/sound_analysis_21_0.png)
+    
+
+
+One more thing... let's test the conversion process to QImage.
+
+
+```python
+from PySide6.QtGui import QImage
+img = final_img_1px
+final_width, final_height = img.size
+texture = QImage(img.tobytes(), final_width, final_height, final_width*3, QImage.Format_RGB888)
+texture.save('final_texture.png')
+```
+
+
+
+
+    True
+
 

@@ -3,9 +3,7 @@ from PySide6.QtOpenGL import QOpenGLTexture
 from PySide6.QtCore import Qt
 from enum import Enum
 from pathlib import Path
-from scipy.io import wavfile as wav
-from scipy.fftpack import fft, fftfreq
-from scipy.fft import rfft
+from scipy.fftpack import fft, ifft
 from scipy.signal.windows import hann
 import numpy as np
 import matplotlib.pyplot as plt
@@ -132,11 +130,19 @@ class InputTextureSound(InputTexture):
         self.create_texture(filename)
 
     @staticmethod
+    def get_audio_part(audio, time_start=0.0, sample_rate=44100, frame_rate=30, nframes = 1):
+        samples_per_frame = int(sample_rate / frame_rate)
+        sample_start = int(time_start * sample_rate)
+        sample_end = sample_start + (nframes * samples_per_frame)
+        N = sample_end - sample_start
+        T = 1.0 / sample_rate
+        t = np.linspace(0, nframes * (1.0 / frame_rate), int(sample_rate * nframes * (1.0 / frame_rate)))
+        audio_part = audio[sample_start:sample_end]
+        return (audio_part, N, T, t)
+
+    @staticmethod
     def array_to_red_image(array) -> Image:
-        """Makes an image from NDArray. Array values are transferred into R channel of RGB."""
         img = None
-        # get rid of imaginary data
-        array = array.real
         # get absolute values
         array = abs(array)
         # get max value
@@ -155,13 +161,23 @@ class InputTextureSound(InputTexture):
         return img
 
     @staticmethod
+    def merge_images(img1: Image, img2: Image):
+        img = None
+        final_width = np.max([img1.size[0], img2.size[0]])
+        final_height = img1.size[1] + img2.size[1]
+        img = Image.new('RGB', size=(final_width, final_height))
+        img.paste(img1, (0, 0))
+        img.paste(img2, (0, img1.size[1]))
+        return img
+
+    @staticmethod
     def fft_filtered(signal):
         """Calculates FFT of the real part of the signal and applies a Hann window"""
         N = signal.shape[0]
         w = hann(N) # Hann window
         c_w = abs(sum(w))
-        fft = rfft(signal * w) / c_w 
-        return fft
+        signal_fft = fft(signal * w) / c_w 
+        return signal_fft
 
 
     @staticmethod
@@ -201,34 +217,23 @@ class InputTextureSound(InputTexture):
         self.texture_.setData(self.prepare_texture(0.0))
 
     def prepare_texture(self, position: float):
-        current_frame = int(position*self.framerate_)
-        samples_per_frame = int(self.sample_rate_ / self.framerate_)
-        sample_start = int(position * self.sample_rate_)
-        sample_end = sample_start + samples_per_frame
-        N = sample_end - sample_start
-        T = 1.0 / self.sample_rate_
-        audio_part = self.audio_[sample_start:sample_end]
-        self.current_frame_ = current_frame
+        audio_part, N, T, t = self.get_audio_part(self.audio_, time_start=position, sample_rate=self.sample_rate_, frame_rate=self.framerate_, nframes=1)
+        self.current_frame_ = int(position*self.framerate_)
 
-        audio_part_img = exposure.rescale_intensity(audio_part, out_range=(-1.0, 1.0))
-        audio_wave_img = self.array_to_red_image(audio_part_img)
+        #audio_part_img = exposure.rescale_intensity(audio_part, out_range=(-1.0, 1.0))
+        audio_wave_img = self.array_to_red_image(audio_part)
         audio_wave_img = audio_wave_img.rotate(90, expand=True)
         audio_wave_img = audio_wave_img.resize((512,1))
 
-        fft = self.fft_filtered(audio_part)
-        reduced_N = int(fft.shape[0]/2)
-        reduced_fft = fft[0:reduced_N]
-        fft_img = self.array_to_red_image(reduced_fft)
+        audio_fft = self.fft_filtered(audio_part)
+        N_part = int(N/4)
+        audio_part_fft = audio_fft[:N_part]
+        fft_img = self.array_to_red_image(audio_part_fft)
         fft_img = fft_img.rotate(90, expand=True)
         fft_img = fft_img.resize((512,1))
         spectrogram_image = fft_img.resize((512,1))
 
-        width_spec, height_spec = spectrogram_image.size
-        width_wave, height_wave = audio_wave_img.size
-
-        final_img = Image.new('RGB', size=(width_spec,height_spec+height_wave))
-        final_img.paste(spectrogram_image, (0, 0))
-        final_img.paste(audio_wave_img, (0, height_spec))
+        final_img = self.merge_images(spectrogram_image, audio_wave_img)
         final_width, final_height = final_img.size
 
         texture = QImage(final_img.tobytes(), final_width, final_height, final_width*3, QImage.Format_RGB888)
