@@ -354,3 +354,69 @@ texture.save('final_texture.png')
     True
 
 
+
+Simple shader for testing the frequencies spectrum:
+```
+void mainImage(out vec4 fragColor, in vec2 fragCoord)
+{
+vec2 uv = fragCoord.xy / iResolution.xy;
+int tx = int(uv.x*512.0);
+float fft  = texelFetch(iChannel0, ivec2(tx,0), 0).x; 
+float wave = texelFetch(iChannel0, ivec2(tx,1), 0).x;
+vec3 col = vec3(fft*4, fft*2, fft);
+fragColor = vec4(col, 1.0);
+}
+```
+
+More advanced one, with bars:
+```
+#define time iTime
+
+vec3 mixc(vec3 col1, vec3 col2, float v)
+{
+    v = clamp(v,0.0,1.0);
+    return col1+v*(col2-col1);
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    vec2 uv = fragCoord.xy / iResolution.xy;
+    vec2 p = uv*2.0-1.0;
+    p.x *= iResolution.x/iResolution.y;
+    p.y += 0.5;
+    
+    vec3 col = vec3(0.0);
+    vec3 ref = vec3(0.0);
+   
+    float nBands = 64.0;
+    float i = floor(uv.x*nBands);
+    float f = fract(uv.x*nBands);
+    float band = i/nBands;
+    band *= band*band;
+    band = band*0.995;
+    band += 0.005;
+    float s = texture(iChannel0, vec2(band,0.25)).x;
+    
+    const int nColors = 4;
+    vec3 colors[nColors];  
+    colors[0] = vec3(0.0,0.0,1.0);
+    colors[1] = vec3(0.0,1.0,1.0);
+    colors[2] = vec3(1.0,1.0,0.0);
+    colors[3] = vec3(1.0,0.0,0.0);
+    
+    vec3 gradCol = colors[0];
+    float n = float(nColors)-1.0;
+    for(int i = 1; i < nColors; i++)
+    {
+        gradCol = mixc(gradCol,colors[i],(s-float(i-1)/n)*n);
+    }
+      
+    col += vec3(1.0-smoothstep(0.0,0.01,p.y-s*1.5));
+    col *= gradCol;
+    col *= smoothstep(0.125,0.375,f);
+    col *= smoothstep(0.875,0.625,f);
+    col = clamp(col, 0.0, 1.0);
+    
+    fragColor = vec4(col,1.0);
+}
+```

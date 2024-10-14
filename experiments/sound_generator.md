@@ -22,10 +22,6 @@ y = y.astype(np.int16)
 wavfile.write(f'sine-freq{frequency}Hz-sr{sampleRate}-len{length}.wav', sampleRate, y)
 ```
 
-    m 0.9999999999936564
-    maxint16 32767
-    
-
 Let's try some sweep:
 
 
@@ -48,4 +44,30 @@ y = maxint16 * y / m
 y = y.astype(np.int16) 
 
 wavfile.write(f'sinesweep-freq{frequency_start}Hz-freq{frequency_end}-sr{sampleRate}-len{length}.wav', sampleRate, y)
+```
+
+Let's compose few frequencies:
+
+
+```python
+sampleRate = 44100
+ts = 1.0 / sampleRate
+frequency_1 = 500
+frequency_2 = 3000
+frequency_3 = 6000
+frequency_4 = 10000
+length = 10
+
+t = np.linspace(0, length, sampleRate * length)
+y = np.sin(frequency_1 * 2 * np.pi * t)
+y += np.sin(frequency_2 * 2 * np.pi * t)
+y += np.sin(frequency_3 * 2 * np.pi * t)
+y += np.sin(frequency_4 * 2 * np.pi * t)
+
+m = np.max(np.abs(y))
+maxint16 = np.iinfo(np.int16).max
+y = maxint16 * y / m
+y = y.astype(np.int16) 
+
+wavfile.write(f'multi_sine_4freqs-sr{sampleRate}-len{length}.wav', sampleRate, y)
 ```

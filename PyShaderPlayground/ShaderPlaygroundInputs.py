@@ -202,14 +202,12 @@ class InputTextureSound(InputTexture):
         # Also, we're loading it as a mono sound.
         INPUT_SAMPLE_RATE = None
         self.audio_, self.sample_rate_ = librosa.load(self.filename_, mono=True, sr=INPUT_SAMPLE_RATE)
-        # if self.audio_.ndim > 1:
-        #     self.audio_ = np.mean(self.audio_, axis=1) # we want mono!
         num_samples = self.audio_.shape[0]
         self.duration_ = num_samples / self.sample_rate_
         self.max_sample_value_ = np.max(self.audio_)
 
         audio_wave_img = self.array_to_red_image(self.audio_)
-        audio_wave_img = audio_wave_img.rotate(-90, expand=True)
+        audio_wave_img = audio_wave_img.rotate(90, expand=True)
         audio_wave_img = audio_wave_img.resize((100,100))
         img = QImage(audio_wave_img.tobytes(), 100, 100, 100*3, QImage.Format_RGB888)
         self.thumbnail_ = QPixmap(img)
@@ -235,7 +233,6 @@ class InputTextureSound(InputTexture):
 
         final_img = self.merge_images(spectrogram_image, audio_wave_img)
         final_width, final_height = final_img.size
-
         texture = QImage(final_img.tobytes(), final_width, final_height, final_width*3, QImage.Format_RGB888)
         #texture.save('final_texture.jpg')
         return texture
