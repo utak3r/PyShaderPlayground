@@ -116,16 +116,18 @@ Let's get rid of the mirrored imaginary part of FFT.
 
 
 ```python
+from scipy.fft import rfft
+
 signal, N, T, t = get_audio_part(multi_sine_4freqs, time_start=0.0, sample_rate=44100, frame_rate=30, nframes=1)
 
-signal_fft = fft(signal)
+signal_fft = rfft(signal)
 freq = t/T
 
-N_half = int(N/2)
-freqs_oneside = freq[0:N_half]
+N_spectrum = int(N/2)
+freqs_oneside = freq[0:N_spectrum]
 
 plt.figure(figsize = (8, 3))
-plt.plot(freqs_oneside, np.abs(signal_fft[:N_half]), 'b')
+plt.plot(freqs_oneside, np.abs(signal_fft[:N_spectrum]), 'b')
 plt.xlabel('Freq (Hz)')
 plt.ylabel('FFT Amplitude')
 plt.show()
@@ -136,45 +138,6 @@ plt.show()
 ![png](sound_analysis_files/sound_analysis_9_0.png)
     
 
-
-Let's try to filter the amplitudes a bit.
-We will use a Hann window for this task.
-
-
-```python
-from scipy.signal.windows import hann
-from scipy.fft import fftfreq
-
-signal, N, T, t = get_audio_part(multi_sine_4freqs, time_start=0.0, sample_rate=44100, frame_rate=30, nframes=1)
-signal_fft = fft(signal)
-freq = t/T
-N_half = int(N/2)
-freqs_oneside = freq[:N_half]
-
-w = hann(N) # Hann window
-c_w = abs(sum(w))
-signal_fft_filtered = fft(signal * w) / c_w
-
-plt.figure(figsize = (10, 3))
-plt.subplot(121)
-plt.plot(freqs_oneside, np.abs(signal_fft[:N_half]), 'b')
-plt.xlabel('Freq (Hz)')
-plt.ylabel('FFT Amplitude')
-plt.subplot(122)
-plt.plot(freqs_oneside, np.abs(signal_fft_filtered[:N_half]), 'b')
-plt.xlabel('Freq (Hz)')
-plt.ylabel('FFT filtered Amplitude')
-plt.tight_layout()
-plt.show()
-```
-
-
-    
-![png](sound_analysis_files/sound_analysis_11_0.png)
-    
-
-
-The last option looks like the best option for visualizing the amplitudes of frequencies.
 
 Nest step is the implementation. The big thing is ShaderToy has its own, very specific, and maybe not the best way of implementing this. That means as a first step we will do it in compliance with ShaderTy, but once we implement another feature in the app, which is individual settings for each loaded texture, we could also add other implementations.
 
@@ -210,41 +173,35 @@ def array_to_red_image(array) -> Image:
 
 
 ```python
-signal, N, T, t = get_audio_part(multi_sine_4freqs, time_start=0.0, sample_rate=44100, frame_rate=30, nframes=1)
-
-w = hann(N) # Hann window
-c_w = abs(sum(w))
-signal_fft = fft(signal * w) / c_w
-print(f'Size of signal FFT: {signal_fft.size}')
-
-N_part = int(N/4)
-freq = t/T
-freqs_part = freq[:N_part]
-signal_fft_part = signal_fft[:N_part]
-
-plt.figure(figsize = (8, 3))
-plt.plot(freqs_part, np.abs(signal_fft_part), 'b')
-plt.show()
-
-fft_img = array_to_red_image(signal_fft_part)
-fft_img = fft_img.rotate(90, expand=True)
-fft_img = fft_img.resize((512,100))
-display(fft_img)
-
+def prepare_image(array, width, height):
+    img = array_to_red_image(array)
+    img = img.rotate(90, expand=True)
+    img = img.resize((width, height))
+    return img
 ```
 
-    Size of signal FFT: 1470
-    
+
+```python
+from scipy.signal.windows import hann
+from scipy.fft import rfft
+
+signal, N, T, t = get_audio_part(multi_sine_4freqs, time_start=0.0, sample_rate=44100, frame_rate=30, nframes=1)
+signal_fft = rfft(signal)
+
+# let's take only first half of freqs
+N_spectrum = int(signal_fft.size/2)
+spectrum = np.linspace(start=0.0, stop=(44100 / 4.0), num=N_spectrum)
+
+for i in range(0, N_spectrum):
+    magnitude = np.log10(np.abs(signal_fft[i]))
+    spectrum[i] = magnitude
+
+display(prepare_image(spectrum, 512, 100))
+```
 
 
     
-![png](sound_analysis_files/sound_analysis_16_1.png)
-    
-
-
-
-    
-![png](sound_analysis_files/sound_analysis_16_2.png)
+![png](sound_analysis_files/sound_analysis_14_0.png)
     
 
 
@@ -270,28 +227,47 @@ wave_img = array_to_red_image(signal)
 wave_img = wave_img.rotate(90, expand=True)
 wave_img = wave_img.resize((512,50))
 
-w = hann(N) # Hann window
-c_w = abs(sum(w))
-signal_fft = fft(signal * w) / c_w
-N_part = int(N/4)
-signal_fft_part = signal_fft[:N_part]
-fft_img = array_to_red_image(signal_fft_part)
-fft_img = fft_img.rotate(90, expand=True)
-fft_img = fft_img.resize((512,50))
+signal_fft = rfft(signal)
+N_spectrum = int(signal_fft.size/2)
+spectrum = np.linspace(start=0.0, stop=(44100 / 4.0), num=N_spectrum)
+for i in range(0, N_spectrum):
+    magnitude = np.log10(np.abs(signal_fft[i]))
+    spectrum[i] = magnitude
 
-final_img_100px = merge_images(fft_img, wave_img)
+spectrum_img = prepare_image(spectrum, 512, 50)
+final_img_100px = merge_images(spectrum_img, wave_img)
 display(final_img_100px)
+```
 
-wave_img_1px = array_to_red_image(signal)
-wave_img_1px = wave_img_1px.rotate(90, expand=True)
-wave_img_1px = wave_img_1px.resize((512,1))
-fft_img_1px = array_to_red_image(signal_fft_part)
-fft_img_1px = fft_img_1px.rotate(90, expand=True)
-fft_img_1px = fft_img_1px.resize((512,1))
 
-final_img_1px = merge_images(fft_img_1px, wave_img_1px)
+    
+![png](sound_analysis_files/sound_analysis_17_0.png)
+    
+
+
+Test on some real music:
+
+
+```python
+import librosa
+audio, sample_rate = librosa.load('test_sound_01.mp3', mono=True, sr=44100)
+signal, N, T, t = get_audio_part(audio, time_start=45.0, sample_rate=sample_rate, frame_rate=30, nframes=1)
+wave_img_100px = prepare_image(signal, 512, 50)
+wave_img_1px = prepare_image(signal, 512, 1)
+
+signal_fft = rfft(signal)
+N_spectrum = int(signal_fft.size/2)
+spectrum = np.linspace(start=0.0, stop=(44100 / 4.0), num=N_spectrum)
+for i in range(0, N_spectrum):
+    magnitude = np.log10(np.abs(signal_fft[i]))
+    spectrum[i] = magnitude
+spectrum_img_100px = prepare_image(spectrum, 512, 50)
+spectrum_img_1px = prepare_image(spectrum, 512, 1)
+
+final_img_100px = merge_images(spectrum_img_100px, wave_img_100px)
+final_img_1px = merge_images(spectrum_img_1px, wave_img_1px)
+display(final_img_100px)
 display(final_img_1px)
-
 ```
 
 
@@ -306,117 +282,30 @@ display(final_img_1px)
     
 
 
-Test on some real music:
+For reference, here's an official example shader from Inigo Quilez (https://iquilezles.org/)
 
-
-```python
-import librosa
-audio, sample_rate = librosa.load('test_sound_01.mp3', mono=True, sr=44100)
-signal, N, T, t = get_audio_part(audio, time_start=45.0, sample_rate=sample_rate, frame_rate=30, nframes=1)
-wave_img = array_to_red_image(signal)
-wave_img = wave_img.rotate(90, expand=True)
-wave_img_100px = wave_img.resize((512,50))
-wave_img_1px = wave_img.resize((512,1))
-w = hann(N) # Hann window
-c_w = abs(sum(w))
-signal_fft = fft(signal * w) / c_w
-N_part = int(N/4)
-signal_fft_part = signal_fft[:N_part]
-fft_img = array_to_red_image(signal_fft_part)
-fft_img = fft_img.rotate(90, expand=True)
-fft_img_100px = fft_img.resize((512,50))
-fft_img_1px = fft_img.resize((512,1))
-final_img_100px = merge_images(fft_img_100px, wave_img_100px)
-final_img_1px = merge_images(fft_img_1px, wave_img_1px)
-display(final_img_100px)
-```
-
-
-    
-![png](sound_analysis_files/sound_analysis_21_0.png)
-    
-
-
-One more thing... let's test the conversion process to QImage.
-
-
-```python
-from PySide6.QtGui import QImage
-img = final_img_1px
-final_width, final_height = img.size
-texture = QImage(img.tobytes(), final_width, final_height, final_width*3, QImage.Format_RGB888)
-texture.save('final_texture.png')
-```
-
-
-
-
-    True
-
-
-
-Simple shader for testing the frequencies spectrum:
 ```
 void mainImage(out vec4 fragColor, in vec2 fragCoord)
 {
-vec2 uv = fragCoord.xy / iResolution.xy;
-int tx = int(uv.x*512.0);
-float fft  = texelFetch(iChannel0, ivec2(tx,0), 0).x; 
-float wave = texelFetch(iChannel0, ivec2(tx,1), 0).x;
-vec3 col = vec3(fft*4, fft*2, fft);
-fragColor = vec4(col, 1.0);
-}
-```
+	// create pixel coordinates
+	vec2 uv = fragCoord.xy / iResolution.xy;
 
-More advanced one, with bars:
-```
-#define time iTime
+	// the sound texture is 512x2
+	int tx = int(uv.x*512.0);
 
-vec3 mixc(vec3 col1, vec3 col2, float v)
-{
-    v = clamp(v,0.0,1.0);
-    return col1+v*(col2-col1);
-}
+	// first row is frequency data (48Khz/4 in 512 texels, meaning 23 Hz per texel)
+	float fft  = texelFetch(iChannel0, ivec2(tx,0), 0).x; 
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
-{
-    vec2 uv = fragCoord.xy / iResolution.xy;
-    vec2 p = uv*2.0-1.0;
-    p.x *= iResolution.x/iResolution.y;
-    p.y += 0.5;
-    
-    vec3 col = vec3(0.0);
-    vec3 ref = vec3(0.0);
-   
-    float nBands = 64.0;
-    float i = floor(uv.x*nBands);
-    float f = fract(uv.x*nBands);
-    float band = i/nBands;
-    band *= band*band;
-    band = band*0.995;
-    band += 0.005;
-    float s = texture(iChannel0, vec2(band,0.25)).x;
-    
-    const int nColors = 4;
-    vec3 colors[nColors];  
-    colors[0] = vec3(0.0,0.0,1.0);
-    colors[1] = vec3(0.0,1.0,1.0);
-    colors[2] = vec3(1.0,1.0,0.0);
-    colors[3] = vec3(1.0,0.0,0.0);
-    
-    vec3 gradCol = colors[0];
-    float n = float(nColors)-1.0;
-    for(int i = 1; i < nColors; i++)
-    {
-        gradCol = mixc(gradCol,colors[i],(s-float(i-1)/n)*n);
-    }
-      
-    col += vec3(1.0-smoothstep(0.0,0.01,p.y-s*1.5));
-    col *= gradCol;
-    col *= smoothstep(0.125,0.375,f);
-    col *= smoothstep(0.875,0.625,f);
-    col = clamp(col, 0.0, 1.0);
-    
-    fragColor = vec4(col,1.0);
+	// second row is the sound wave, one texel is one mono sample
+	float wave = texelFetch(iChannel0, ivec2(tx,1), 0).x;
+
+	// convert frequency to colors
+	vec3 col = vec3(fft, 4.0*fft*(1.0-fft), 1.0-fft) * fft;
+
+	// add wave form on top	
+	col += 1.0 -  smoothstep(0.0, 0.15, abs(wave - uv.y));
+
+	// output final color
+	fragColor = vec4(col,1.0);
 }
 ```

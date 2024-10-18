@@ -6,13 +6,6 @@ from pathlib import Path
 from scipy.fftpack import fft, ifft
 from scipy.signal.windows import hann
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
-from matplotlib import colors as clrs
-from skimage.transform import resize
-from skimage import exposure
-import skimage.io
 import librosa
 from PIL import Image
 
@@ -169,30 +162,12 @@ class InputTextureSound(InputTexture):
         img.paste(img1, (0, 0))
         img.paste(img2, (0, img1.size[1]))
         return img
-
-    @staticmethod
-    def fft_filtered(signal):
-        """Calculates FFT of the real part of the signal and applies a Hann window"""
-        N = signal.shape[0]
-        w = hann(N) # Hann window
-        c_w = abs(sum(w))
-        signal_fft = fft(signal * w) / c_w 
-        return signal_fft
-
-
-    @staticmethod
-    def fft_db(input):
-        """Calculates FFT of the real part of the signal and scales amplitudes to dB"""
-        fft = np.abs(np.fft.rfft(input))
-        fftdb = 20 * np.log10(fft)
-        return fftdb
-
     
     @staticmethod
-    def scale_minmax(X, min=0.0, max=1.0):
-        X_std = (X - X.min()) / (X.max() - X.min())
-        X_scaled = X_std * (max - min) + min
-        return X_scaled
+    def transform_image(img: Image, rotation=0.0, width=1024, height=1024):
+        img_out = img.rotate(rotation, expand=True)
+        img_out = img_out.resize((width, height))
+        return img_out
 
 
     def create_texture(self, filename: str):
@@ -207,29 +182,34 @@ class InputTextureSound(InputTexture):
         self.max_sample_value_ = np.max(self.audio_)
 
         audio_wave_img = self.array_to_red_image(self.audio_)
-        audio_wave_img = audio_wave_img.rotate(90, expand=True)
-        audio_wave_img = audio_wave_img.resize((100,100))
+        audio_wave_img = self.transform_image(audio_wave_img, 90, 100, 100)
         img = QImage(audio_wave_img.tobytes(), 100, 100, 100*3, QImage.Format_RGB888)
         self.thumbnail_ = QPixmap(img)
 
         self.texture_.setData(self.prepare_texture(0.0))
 
+    @staticmethod
+    def calculate_spectrum(signal, min_value, max_value, N):
+        signal_fft = np.fft.rfft(signal)
+        N_spectrum = int(signal_fft.size/2)
+        spectrum = np.linspace(start=min_value, stop=max_value, num=N)
+        
+        for i in range(0, N_spectrum):
+            magnitude = np.log10(np.abs(signal_fft[i]))
+            spectrum[i] = magnitude
+        return spectrum
+
+
     def prepare_texture(self, position: float):
         audio_part, N, T, t = self.get_audio_part(self.audio_, time_start=position, sample_rate=self.sample_rate_, frame_rate=self.framerate_, nframes=1)
         self.current_frame_ = int(position*self.framerate_)
 
-        #audio_part_img = exposure.rescale_intensity(audio_part, out_range=(-1.0, 1.0))
         audio_wave_img = self.array_to_red_image(audio_part)
-        audio_wave_img = audio_wave_img.rotate(90, expand=True)
-        audio_wave_img = audio_wave_img.resize((512,1))
+        audio_wave_img = self.transform_image(audio_wave_img, 90, 512, 1)
 
-        audio_fft = self.fft_filtered(audio_part)
-        N_part = int(N/4)
-        audio_part_fft = audio_fft[:N_part]
-        fft_img = self.array_to_red_image(audio_part_fft)
-        fft_img = fft_img.rotate(90, expand=True)
-        fft_img = fft_img.resize((512,1))
-        spectrogram_image = fft_img.resize((512,1))
+        audio_spectrum = self.calculate_spectrum(audio_part, 0.0, (self.sample_rate_ / 4.0), int(N/4))
+        spectrogram_image = self.array_to_red_image(audio_spectrum)
+        spectrogram_image = self.transform_image(spectrogram_image, 90, 512, 1)
 
         final_img = self.merge_images(spectrogram_image, audio_wave_img)
         final_width, final_height = final_img.size
