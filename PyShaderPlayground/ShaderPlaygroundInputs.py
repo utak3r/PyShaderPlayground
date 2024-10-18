@@ -152,6 +152,11 @@ class InputTextureSound(InputTexture):
         # merge it. Real image goes to R channel, while G and B channels filled with zeroes
         img = Image.merge(mode='RGB', bands=(img, img_zero, img_zero))
         return img
+    
+    @staticmethod
+    def array_to_rgb_image(array) -> Image:
+        img = None
+        return img
 
     @staticmethod
     def merge_images(img1: Image, img2: Image):
