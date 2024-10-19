@@ -194,13 +194,27 @@ class InputTextureSound(InputTexture):
         self.texture_.setData(self.prepare_texture(0.0))
 
     @classmethod
-    def log10_safe_zeroes(cls, input_array):
+    def log10_safe_zeroes_array(cls, input_array):
         '''Safe log10 for an array.'''
         '''It's NOT correct though, as it returns 0 for near 0 values.'''
         '''It should return some arbitrary negative value, but in our use case, 0 is more convinient IMO.'''
         '''And... yes, it IS slowing down the rendering process, unfortunately. Need to find a faster way in a future.'''
         safe = np.where(input_array > 1.0e-10, input_array, 1.0e-10)
         result = np.where(input_array > 1.0e-10, np.log10(safe), 0)
+        return result
+    
+    @classmethod
+    def log10_safe_zeroes_value(cls, value):
+        '''Safe log10 for a single value'''
+        '''Note: it's not toally correct, as it returns 0 for value 0, as it's more convinient in our use case.'''
+        '''Note 2: it's also performing abs(x).'''
+        safe = value
+        result = 0
+        if value < 0: safe = -1.0 * value
+        if safe < 1.0e-10: 
+            result = 0
+        else:
+            result = np.log10(safe)
         return result
 
     @classmethod
@@ -210,7 +224,8 @@ class InputTextureSound(InputTexture):
         spectrum = np.linspace(start=min_value, stop=max_value, num=N)
         
         for i in range(0, N_spectrum):
-            magnitude = InputTextureSound.log10_safe_zeroes(np.abs(signal_fft[i]))
+            magnitude = InputTextureSound.log10_safe_zeroes_value(signal_fft[i].real)
+            #magnitude = InputTextureSound.log10_safe_zeroes_array(np.abs(signal_fft[i]))
             spectrum[i] = magnitude
         return spectrum
 
