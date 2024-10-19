@@ -122,8 +122,8 @@ class InputTextureSound(InputTexture):
         #self.colormap_ = InputTextureSound.create_color_map()
         self.create_texture(filename)
 
-    @staticmethod
-    def get_audio_part(audio, time_start=0.0, sample_rate=44100, frame_rate=30, nframes = 1):
+    @classmethod
+    def get_audio_part(cls, audio, time_start=0.0, sample_rate=44100, frame_rate=30, nframes = 1):
         samples_per_frame = int(sample_rate / frame_rate)
         sample_start = int(time_start * sample_rate)
         sample_end = sample_start + (nframes * samples_per_frame)
@@ -133,8 +133,8 @@ class InputTextureSound(InputTexture):
         audio_part = audio[sample_start:sample_end]
         return (audio_part, N, T, t)
 
-    @staticmethod
-    def array_to_red_image(array) -> Image:
+    @classmethod
+    def array_to_red_image(cls, array) -> Image:
         img = None
         # get absolute values
         array = abs(array)
@@ -153,13 +153,13 @@ class InputTextureSound(InputTexture):
         img = Image.merge(mode='RGB', bands=(img, img_zero, img_zero))
         return img
     
-    @staticmethod
-    def array_to_rgb_image(array) -> Image:
+    @classmethod
+    def array_to_rgb_image(cls, array) -> Image:
         img = None
         return img
 
-    @staticmethod
-    def merge_images(img1: Image, img2: Image):
+    @classmethod
+    def merge_images(cls, img1: Image, img2: Image):
         img = None
         final_width = np.max([img1.size[0], img2.size[0]])
         final_height = img1.size[1] + img2.size[1]
@@ -168,8 +168,8 @@ class InputTextureSound(InputTexture):
         img.paste(img2, (0, img1.size[1]))
         return img
     
-    @staticmethod
-    def transform_image(img: Image, rotation=0.0, width=1024, height=1024):
+    @classmethod
+    def transform_image(cls, img: Image, rotation=0.0, width=1024, height=1024):
         img_out = img.rotate(rotation, expand=True)
         img_out = img_out.resize((width, height))
         return img_out
@@ -186,37 +186,46 @@ class InputTextureSound(InputTexture):
         self.duration_ = num_samples / self.sample_rate_
         self.max_sample_value_ = np.max(self.audio_)
 
-        audio_wave_img = self.array_to_red_image(self.audio_)
-        audio_wave_img = self.transform_image(audio_wave_img, 90, 100, 100)
+        audio_wave_img = InputTextureSound.array_to_red_image(self.audio_)
+        audio_wave_img = InputTextureSound.transform_image(audio_wave_img, 90, 100, 100)
         img = QImage(audio_wave_img.tobytes(), 100, 100, 100*3, QImage.Format_RGB888)
         self.thumbnail_ = QPixmap(img)
 
         self.texture_.setData(self.prepare_texture(0.0))
 
-    @staticmethod
-    def calculate_spectrum(signal, min_value, max_value, N):
+    @classmethod
+    def log10_safe_zeroes(cls, input_array):
+        '''Safe log10 for an array.'''
+        '''It's NOT correct though, as it returns 0 for near 0 values.'''
+        '''It should return some arbitrary negative value, but in our use case, 0 is more convinient IMO.'''
+        '''And... yes, it IS slowing down the rendering process, unfortunately. Need to find a faster way in a future.'''
+        safe = np.where(input_array > 1.0e-10, input_array, 1.0e-10)
+        result = np.where(input_array > 1.0e-10, np.log10(safe), 0)
+        return result
+
+    @classmethod
+    def calculate_spectrum(cls, signal, min_value, max_value, N):
         signal_fft = np.fft.rfft(signal)
         N_spectrum = int(signal_fft.size/2)
         spectrum = np.linspace(start=min_value, stop=max_value, num=N)
         
         for i in range(0, N_spectrum):
-            magnitude = np.log10(np.abs(signal_fft[i]))
+            magnitude = InputTextureSound.log10_safe_zeroes(np.abs(signal_fft[i]))
             spectrum[i] = magnitude
         return spectrum
 
-
     def prepare_texture(self, position: float):
-        audio_part, N, T, t = self.get_audio_part(self.audio_, time_start=position, sample_rate=self.sample_rate_, frame_rate=self.framerate_, nframes=1)
+        audio_part, N, T, t = InputTextureSound.get_audio_part(self.audio_, time_start=position, sample_rate=self.sample_rate_, frame_rate=self.framerate_, nframes=1)
         self.current_frame_ = int(position*self.framerate_)
 
-        audio_wave_img = self.array_to_red_image(audio_part)
-        audio_wave_img = self.transform_image(audio_wave_img, 90, 512, 1)
+        audio_wave_img = InputTextureSound.array_to_red_image(audio_part)
+        audio_wave_img = InputTextureSound.transform_image(audio_wave_img, 90, 512, 1)
 
-        audio_spectrum = self.calculate_spectrum(audio_part, 0.0, (self.sample_rate_ / 4.0), int(N/4))
-        spectrogram_image = self.array_to_red_image(audio_spectrum)
-        spectrogram_image = self.transform_image(spectrogram_image, 90, 512, 1)
+        audio_spectrum = InputTextureSound.calculate_spectrum(audio_part, 0.0, (self.sample_rate_ / 4.0), int(N/4))
+        spectrogram_image = InputTextureSound.array_to_red_image(audio_spectrum)
+        spectrogram_image = InputTextureSound.transform_image(spectrogram_image, 90, 512, 1)
 
-        final_img = self.merge_images(spectrogram_image, audio_wave_img)
+        final_img = InputTextureSound.merge_images(spectrogram_image, audio_wave_img)
         final_width, final_height = final_img.size
         texture = QImage(final_img.tobytes(), final_width, final_height, final_width*3, QImage.Format_RGB888)
         #texture.save('final_texture.jpg')
