@@ -7,6 +7,7 @@ from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
 from pathlib import Path
 from PyShaderPlayground.process_tools import ProcessRunner
 from PyShaderPlayground.VideoEncodingParams import VideoEncodingParams
+from PyShaderPlayground.ShaderPlaygroundInputs import InputTexture2D, InputTextureSound
 from os import path
 
 class ShaderPlayground(QMainWindow):
@@ -230,6 +231,11 @@ class ShaderPlayground(QMainWindow):
                 frames = duration * framerate
                 ffmpeg = "\"" + params_dialog.get_ffmpeg() + "\""
                 codec = params_dialog.get_codec()
+                music_added = None
+                if type(self.opengl.get_texture(0)) is InputTextureSound:
+                    music_added = self.opengl.get_texture(0).get_texture_filename()
+                elif type(self.opengl.get_texture(1)) is InputTextureSound:
+                    music_added = self.opengl.get_texture(1).get_texture_filename()
                 # render frames
                 orig_framerate = self.opengl.animation_framerate()
                 self.opengl.animation_stop()
@@ -247,7 +253,11 @@ class ShaderPlayground(QMainWindow):
                 render_progress_dlg.setValue(frames)
                 if not was_canceled:
                     # encode video
-                    command = ffmpeg + " -r " + str(framerate) + " -f image2 -i \"" + str(temp_dir.joinpath("frame_")) + "%06d.png\" " + codec + " -y \"" + filename[0] + "\""
+                    music_cmd = ""
+                    if music_added is not None:
+                        music_cmd = f" -i \"{music_added}\" -acodec copy "
+                    command = f"{ffmpeg} -r {str(framerate)} -f image2 -i \"{str(temp_dir.joinpath("frame_"))}%06d.png\" {music_cmd} -y \"{filename[0]}\""
+                    #command = ffmpeg + " -r " + str(framerate) + " -f image2 -i \"" + str(temp_dir.joinpath("frame_")) + "%06d.png\" " + music_cmd + codec + " -y \"" + filename[0] + "\""
                     self.runner = ProcessRunner()
                     self.runner.run_command(command)
                 # remove temp files and dir

@@ -40,6 +40,9 @@ class InputTexture():
 
     def get_texture(self) -> QOpenGLTexture:
         return self.texture_
+    
+    def get_texture_filename(self) -> str:
+        return self.filename_
 
     def create_texture(self):
         self.texture_ = QOpenGLTexture(QOpenGLTexture.Target2D)
