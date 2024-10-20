@@ -257,7 +257,6 @@ class ShaderPlayground(QMainWindow):
                     if music_added is not None:
                         music_cmd = f" -i \"{music_added}\" -acodec copy "
                     command = f"{ffmpeg} -r {str(framerate)} -f image2 -i \"{str(temp_dir.joinpath("frame_"))}%06d.png\" {music_cmd} -y \"{filename[0]}\""
-                    #command = ffmpeg + " -r " + str(framerate) + " -f image2 -i \"" + str(temp_dir.joinpath("frame_")) + "%06d.png\" " + music_cmd + codec + " -y \"" + filename[0] + "\""
                     self.runner = ProcessRunner()
                     self.runner.run_command(command)
                 # remove temp files and dir
