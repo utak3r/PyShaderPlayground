@@ -125,6 +125,9 @@ class InputTextureSound(InputTexture):
         #self.colormap_ = InputTextureSound.create_color_map()
         self.create_texture(filename)
 
+    def get_audio_duration(self) -> bool:
+        return self.duration_
+
     @classmethod
     def get_audio_part(cls, audio, time_start=0.0, sample_rate=44100, frame_rate=30, nframes = 1):
         samples_per_frame = int(sample_rate / frame_rate)
@@ -144,7 +147,10 @@ class InputTextureSound(InputTexture):
         # get max value
         max = np.max(array)
         # normalize to 0.0 - 1.0 range
-        arrayuint8 = array.astype(np.float64) / max
+        if max > 0:
+            arrayuint8 = array.astype(np.float64) / max
+        else:
+            arrayuint8 = array.astype(np.float64)
         # make it uint8 data
         arrayuint8 = 255 * arrayuint8
         # grey image from array
@@ -241,12 +247,13 @@ class InputTextureSound(InputTexture):
     def set_position(self, position: float):
         if DEBUG_USE_SET_AUDIO_POSITION:
             position = DEBUG_AUDIO_POSITION
-        if position != self.current_position_:
-            if self.is_texture_created():
-                super().destroy_texture()
-                super().create_texture()
-            self.texture_.setData(self.prepare_texture(position))
-            self.current_position_ = position
+        if position <= self.get_audio_duration():
+            if position != self.current_position_:
+                if self.is_texture_created():
+                    super().destroy_texture()
+                    super().create_texture()
+                self.texture_.setData(self.prepare_texture(position))
+                self.current_position_ = position
 
     def get_thumbnail(self) -> QPixmap:
         pixmap = None
