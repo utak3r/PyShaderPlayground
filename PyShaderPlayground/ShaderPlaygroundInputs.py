@@ -127,8 +127,11 @@ class InputTextureSound(InputTexture):
         #self.colormap_ = InputTextureSound.create_color_map()
         self.create_texture(filename)
 
-    def get_audio_duration(self) -> bool:
+    def get_audio_duration(self):
         return self.duration_
+
+    def get_audio_duration_ceiling(self):
+        return np.ceil(self.duration_)
 
     @classmethod
     def get_audio_part(cls, audio, time_start=0.0, sample_rate=44100, frame_rate=30, nframes = 1):

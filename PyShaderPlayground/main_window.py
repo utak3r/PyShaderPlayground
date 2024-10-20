@@ -218,10 +218,10 @@ class ShaderPlayground(QMainWindow):
             music_duration = 0
             if type(self.opengl.get_texture(0)) is InputTextureSound:
                 music_added = self.opengl.get_texture(0).get_texture_filename()
-                music_duration = self.opengl.get_texture(0).get_audio_duration()
+                music_duration = self.opengl.get_texture(0).get_audio_duration_ceiling()
             elif type(self.opengl.get_texture(1)) is InputTextureSound:
                 music_added = self.opengl.get_texture(1).get_texture_filename()
-                music_duration = self.opengl.get_texture(0).get_audio_duration()
+                music_duration = self.opengl.get_texture(0).get_audio_duration_ceiling()
             if music_added is not None:
                 params_dialog.set_duration(music_duration)
             if QDialog.Accepted == params_dialog.exec():
