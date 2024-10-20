@@ -197,27 +197,17 @@ class InputTextureSound(InputTexture):
         self.texture_.setData(self.prepare_texture(0.0))
 
     @classmethod
-    def log10_safe_zeroes_array(cls, input_array):
-        '''Safe log10 for an array.'''
-        '''It's NOT correct though, as it returns 0 for near 0 values.'''
-        '''It should return some arbitrary negative value, but in our use case, 0 is more convinient IMO.'''
-        '''And... yes, it IS slowing down the rendering process, unfortunately. Need to find a faster way in a future.'''
-        safe = np.where(input_array > 1.0e-10, input_array, 1.0e-10)
-        result = np.where(input_array > 1.0e-10, np.log10(safe), 0)
-        return result
-    
-    @classmethod
-    def log10_safe_zeroes_value(cls, value):
-        '''Safe log10 for a single value'''
-        '''Note: it's not toally correct, as it returns 0 for value 0, as it's more convinient in our use case.'''
-        '''Note 2: it's also performing abs(x).'''
-        safe = value
+    def calculate_magnitude_db(cls, value):
+        '''Calculate magnitude of a complex value and scale it in dB.'''
+        '''Do some simplifying things, like zeroing some values before log10.'''
+        '''Also note, we're not multiplying it by 20, as it will be rescaled afterwards anyway,'''
+        '''so the magnitude values are 1/20 dB in fact.'''
         result = 0
-        if value < 0: safe = -1.0 * value
-        if safe < 1.0e-10: 
-            result = 0
+        magnitude  = np.sqrt(np.pow(value.real, 2) + np.pow(value.imag, 2))
+        if magnitude < 1.0:
+            result = 0.0
         else:
-            result = np.log10(safe)
+            result = np.log10(magnitude)
         return result
 
     @classmethod
@@ -227,8 +217,7 @@ class InputTextureSound(InputTexture):
         spectrum = np.linspace(start=min_value, stop=max_value, num=N)
         
         for i in range(0, N_spectrum):
-            magnitude = InputTextureSound.log10_safe_zeroes_value(signal_fft[i].real)
-            #magnitude = InputTextureSound.log10_safe_zeroes_array(np.abs(signal_fft[i]))
+            magnitude = InputTextureSound.calculate_magnitude_db(signal_fft[i])
             spectrum[i] = magnitude
         return spectrum
 
