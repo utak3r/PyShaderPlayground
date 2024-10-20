@@ -121,6 +121,10 @@ class VideoEncodingParams(QDialog):
         """ Returns current duration. """
         return self.Form.Duration.value()
     
+    def set_duration(self, value):
+        """ Sets new duration. """
+        self.Form.Duration.setValue(int(value))
+    
     def get_framerate(self):
         """ Returns current framerate. """
         return self.Form.Framerate.value()

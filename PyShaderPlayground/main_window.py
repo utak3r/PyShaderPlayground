@@ -214,6 +214,16 @@ class ShaderPlayground(QMainWindow):
             "render_image", "Video Files (*.mp4 *.mov *.avi)")
         if filename[0] != "":
             params_dialog = VideoEncodingParams(self.settings, self)
+            music_added = None
+            music_duration = 0
+            if type(self.opengl.get_texture(0)) is InputTextureSound:
+                music_added = self.opengl.get_texture(0).get_texture_filename()
+                music_duration = self.opengl.get_texture(0).get_audio_duration()
+            elif type(self.opengl.get_texture(1)) is InputTextureSound:
+                music_added = self.opengl.get_texture(1).get_texture_filename()
+                music_duration = self.opengl.get_texture(0).get_audio_duration()
+            if music_added is not None:
+                params_dialog.set_duration(music_duration)
             if QDialog.Accepted == params_dialog.exec():
                 width = params_dialog.get_width()
                 height = params_dialog.get_height()
@@ -231,11 +241,6 @@ class ShaderPlayground(QMainWindow):
                 frames = duration * framerate
                 ffmpeg = "\"" + params_dialog.get_ffmpeg() + "\""
                 codec = params_dialog.get_codec()
-                music_added = None
-                if type(self.opengl.get_texture(0)) is InputTextureSound:
-                    music_added = self.opengl.get_texture(0).get_texture_filename()
-                elif type(self.opengl.get_texture(1)) is InputTextureSound:
-                    music_added = self.opengl.get_texture(1).get_texture_filename()
                 # render frames
                 orig_framerate = self.opengl.animation_framerate()
                 self.opengl.animation_stop()
