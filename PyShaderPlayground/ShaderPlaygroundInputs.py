@@ -8,6 +8,8 @@ from scipy.signal.windows import hann
 import numpy as np
 import librosa
 from PIL import Image
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 DEBUG_USE_SET_AUDIO_POSITION = False
 DEBUG_AUDIO_POSITION = 14.0
@@ -183,6 +185,25 @@ class InputTextureSound(InputTexture):
         img_out = img_out.resize((width, height))
         return img_out
 
+    @classmethod
+    def wave_to_img(cls, signal, sr, width, height) -> Image:
+        fig = plt.figure(figsize=(width/100.0, height/100.0), dpi=100)
+        canvas = FigureCanvas(fig)
+        ax = plt.axes()
+        ax.set_axis_off()
+        ax.margins(0)
+        ax.plot(np.arange(signal.size) / sr, signal)
+        fig.tight_layout()
+        canvas.draw()
+        img = np.fromstring(canvas.tostring_rgb(), dtype='uint8').reshape(height, width, 3)
+        img = Image.fromarray(img, mode='RGB')
+        img = img.resize((width, height), resample=Image.BILINEAR)
+        plt.close(fig)
+        return img
+
+    @classmethod
+    def image_to_qimage(cls, image, width, height) -> QImage:
+        return QImage(image.tobytes(), width, height, width*3, QImage.Format_RGB888)
 
     def create_texture(self, filename: str):
         super().create_texture()
@@ -195,11 +216,7 @@ class InputTextureSound(InputTexture):
         self.duration_ = num_samples / self.sample_rate_
         self.max_sample_value_ = np.max(self.audio_)
 
-        audio_wave_img = InputTextureSound.array_to_red_image(self.audio_)
-        audio_wave_img = InputTextureSound.transform_image(audio_wave_img, 90, 100, 100)
-        img = QImage(audio_wave_img.tobytes(), 100, 100, 100*3, QImage.Format_RGB888)
-        self.thumbnail_ = QPixmap(img)
-
+        self.thumbnail_ = QPixmap(InputTextureSound.image_to_qimage(InputTextureSound.wave_to_img(self.audio_, self.sample_rate_, 100, 100), 100, 100))
         self.texture_.setData(self.prepare_texture(0.0))
 
     @classmethod
