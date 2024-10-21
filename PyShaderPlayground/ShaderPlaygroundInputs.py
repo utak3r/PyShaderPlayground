@@ -267,7 +267,7 @@ class InputTextureSound(InputTexture):
     def set_position(self, position: float):
         if DEBUG_USE_SET_AUDIO_POSITION:
             position = DEBUG_AUDIO_POSITION
-        if position <= self.get_audio_duration():
+        if position <= self.get_audio_duration() and position >= 0.0:
             if position != self.current_position_:
                 if self.is_texture_created():
                     super().destroy_texture()

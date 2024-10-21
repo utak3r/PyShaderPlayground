@@ -54,7 +54,8 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
             "}\n"
         self.shader_fallback_ = ""
         
-        self.vertices_ = [ -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0 ]
+        self.vertices_ = [ -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0 ]
+        #self.vertices_ = [ -0.8, 0.8, 0.8, 0.8, -0.8, -0.8, 0.8, -0.8 ] # for debug reasons, not a full screen
         self.resize(self.width_, self.height_)
 
         self.timer_ = QTimer(self)
@@ -122,17 +123,17 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
 
         self.shader_vertex_ = QOpenGLShader(QOpenGLShader.Vertex)
         self.shader_vertex_.compileSourceCode(
-            "#version 150\n" +
+            "#version 330 core\n" +
             "attribute vec3 position;\n" +
             "void main()\n" +
             "{\n" +
-            "gl_Position = vec4(position, 1.0);\n" +
+            "gl_Position = vec4(position, 1.0f);\n" +
             "}\n"
         )
         self.shader_fragment_ = QOpenGLShader(QOpenGLShader.Fragment)
 
         self.shader_template_pre_ = \
-            "#version 150\n" \
+            "#version 330 core\n" \
             "uniform vec3 iResolution;				// The viewport resolution (z is pixel aspect ratio, usually 1.0)\n" \
             "uniform vec2 iGlobalTime;				// shader playback time (in seconds)\n" \
             "uniform vec4 iMouse;                   // mouse pixel coords. xy: current (if MLB down), zw: click\n" \
@@ -222,7 +223,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         self.glClearColor(0.0, 0.0, 0.0, 1.0)
         self.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
 
-        self.glFrontFace(gl.GL_CW)
+        self.glFrontFace(gl.GL_CCW)
         self.glCullFace(gl.GL_FRONT)
         self.glEnable(gl.GL_CULL_FACE)
         self.glEnable(gl.GL_DEPTH_TEST)
