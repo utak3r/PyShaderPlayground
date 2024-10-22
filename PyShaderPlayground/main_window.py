@@ -10,7 +10,7 @@ from PyShaderPlayground.VideoEncodingParams import VideoEncodingParams
 from os import path
 
 class ShaderPlayground(QMainWindow):
-    def __init__(self):
+    def __init__(self, preloaded_shader: str = ''):
         QMainWindow.__init__(self)
         self.init_ui(path.abspath(path.join(path.dirname(__file__), 'ShaderPlayground.ui')))
         self.opengl = self.centralWidget().player
@@ -47,6 +47,10 @@ class ShaderPlayground(QMainWindow):
         self.centralWidget().texture0.clicked.connect(self.load_texture_0)
         self.centralWidget().texture1.clicked.connect(self.load_texture_1)
         self.runner = None
+
+        if preloaded_shader != '':
+            self.current_filename = preloaded_shader
+            self.read_shader_from_file(preloaded_shader)
 
 
     def init_ui(self, filename):
@@ -89,14 +93,23 @@ class ShaderPlayground(QMainWindow):
         shader = self.centralWidget().txtShaderEditor.toPlainText()
         self.opengl.set_shader(shader)
 
+    def read_shader_from_file(self, filename: str):
+        if filename != "":
+            try:
+                with open(filename) as file:
+                    self.current_filename = filename
+                    self.centralWidget().txtShaderEditor.setText(file.read())
+            except (FileNotFoundError):
+                print(f'Requested shader file {filename} was not found.')
+
     @Slot()
     def open_shader_from_file(self):
         """ Load a shader from a file into editor. """
         filename = QFileDialog.getOpenFileName(self, "Open shader", ".", "Shader files (*.glsl)")
-        if filename[0] != "":
-            with open(filename[0]) as file:
-                self.current_filename = filename[0]
-                self.centralWidget().txtShaderEditor.setText(file.read())
+        if filename[0] != "": self.read_shader_from_file(filename[0])
+            # with open(filename[0]) as file:
+            #     self.current_filename = filename[0]
+            #     self.centralWidget().txtShaderEditor.setText(file.read())
 
     @Slot()
     def save_shader_to_file(self):
