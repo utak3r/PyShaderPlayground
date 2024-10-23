@@ -261,12 +261,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         # save screen rendering size
         orig_width = self.width_
         orig_height = self.height_
-        # Ok, here's the thing...
-        # Without below current screen buffer grab...
-        # following FBO doesn't work as expected??!
-        # WTF...
-        fbImage = self.grabFramebuffer()
-        #fbImage.save(f'{name}_screenbuffer.{ext}', img_type, 95)
+        dummy_img = self.grabFramebuffer()
         # create an offscreen frame buffer
         buffer = QOpenGLFramebufferObject(width, height)
         if buffer.bind():

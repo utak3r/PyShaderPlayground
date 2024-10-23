@@ -246,8 +246,12 @@ class ShaderPlayground(QMainWindow):
                 try:
                     temp_dir.mkdir()
                 except FileExistsError as exc:
-                    ShaderPlayground.remove_dir(temp_dir)
-                    temp_dir.mkdir()
+                    try:
+                        ShaderPlayground.remove_dir(temp_dir)
+                        temp_dir.mkdir()
+                    except PermissionError as exc2:
+                        print(f'Couldn\'t remove directory {temp_dir}')
+                    
                 # info
                 duration = params_dialog.get_duration()
                 framerate = params_dialog.get_framerate()
@@ -278,7 +282,7 @@ class ShaderPlayground(QMainWindow):
                     self.runner = ProcessRunner()
                     self.runner.run_command(command)
                 # remove temp files and dir
-                ShaderPlayground.remove_dir(temp_dir)
+                #ShaderPlayground.remove_dir(temp_dir)
                 # resume playing
                 self.opengl.set_animation_speed(1.0, orig_framerate)
                 self.opengl.animation_play()
