@@ -9,7 +9,8 @@ import numpy as np
 import librosa
 from PIL import Image
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+#from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvas
 
 DEBUG_USE_SET_AUDIO_POSITION = False
 DEBUG_AUDIO_POSITION = 14.0
@@ -189,7 +190,7 @@ class InputTextureSound(InputTexture):
         return img_out
 
     @classmethod
-    def wave_to_img(cls, signal, sr, width, height) -> Image:
+    def wave_to_pixmap(cls, signal, sr, width, height) -> Image:
         fig = plt.figure(figsize=(width/100.0, height/100.0), dpi=100)
         canvas = FigureCanvas(fig)
         ax = plt.axes()
@@ -198,11 +199,18 @@ class InputTextureSound(InputTexture):
         ax.plot(np.arange(signal.size) / sr, signal)
         fig.tight_layout()
         canvas.draw()
-        img = np.fromstring(canvas.tostring_rgb(), dtype='uint8').reshape(height, width, 3)
-        img = Image.fromarray(img, mode='RGB')
-        img = img.resize((width, height), resample=Image.BILINEAR)
+        buffer_rgba = canvas.buffer_rgba()
+        img = QImage(buffer_rgba, buffer_rgba.shape[1], buffer_rgba.shape[0],
+                                  QImage.Format.Format_RGBA8888)
+        pixmap = QPixmap(
+            QImage(
+                buffer_rgba, 
+                buffer_rgba.shape[1], 
+                buffer_rgba.shape[0], 
+                QImage.Format.Format_RGBA8888
+                ).scaled(width, height, Qt.IgnoreAspectRatio))
         plt.close(fig)
-        return img
+        return pixmap
 
     @classmethod
     def image_to_qimage(cls, image, width, height) -> QImage:
@@ -219,7 +227,7 @@ class InputTextureSound(InputTexture):
         self.duration_ = num_samples / self.sample_rate_
         self.max_sample_value_ = np.max(self.audio_)
 
-        self.thumbnail_ = QPixmap(InputTextureSound.image_to_qimage(InputTextureSound.wave_to_img(self.audio_, self.sample_rate_, 100, 100), 100, 100))
+        self.thumbnail_ = InputTextureSound.wave_to_pixmap(self.audio_, self.sample_rate_, 100, 100)
         self.texture_.setData(self.prepare_texture(0.0))
 
     @classmethod
