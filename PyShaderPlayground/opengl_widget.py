@@ -71,6 +71,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
     def timer_tick(self):
         """ Increment self.global_time variable for animating. """
         self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * self.framerate_ / 1000.0)
+        self.update()
 
     def animation_framerate(self):
         """ Returns current animation's framerate. """
@@ -103,12 +104,14 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
     def animation_rewind(self):
         """ Rewinds the animation by resetting the global timer counter. """
         self.global_time = 0.0
+        self.update()
 
     def set_animation_speed_modifier(self, value):
         """ Temporary animation speed changing. """
         self.anim_speed_modifier_ = value
         if value != 1.0 and not self.is_playing():
             self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * self.framerate_ / 1000.0)
+        self.update()
 
     def increment_animation(self, frames: int):
         """ Advance animation for given frames number. """
@@ -191,6 +194,12 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
             self.program_.link()
             self.program_.bind()
 
+            # for debug:
+            """ with open('fragment_vertex.temp.glsl', 'w') as f:
+                f.write(self.shader_vertex_.sourceCode().toStdString())
+            with open('fragment_shader.temp.glsl', 'w') as f:
+                f.write(self.shader_fragment_.sourceCode().toStdString()) """
+
             self.attrib_position = self.program_.attributeLocation("position")
             self.uniform_iGlobalTime = self.program_.uniformLocation("iGlobalTime")
             self.uniform_iResolution = self.program_.uniformLocation("iResolution")
@@ -248,8 +257,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         self.program_.release()
         self.glDisable(gl.GL_DEPTH_TEST)
         self.glDisable(gl.GL_CULL_FACE)
-        self.update()
-
+        #self.update()
 
     def render_image(self, filename: str, width: int, height: int):
         """ Offscreen rendering with a specified size, saved to a file. """
