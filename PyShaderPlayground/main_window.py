@@ -27,7 +27,7 @@ class ShaderPlayground(QMainWindow):
         self.centralWidget().AnimationSlider.valueUpdated.connect(self.change_animation)
 
         self.current_filename = ""
-        self.resize(1280, 540)
+        #self.resize(1280, 540)
         if self.opengl.is_playing():
             self.centralWidget().btnPlayPause.setText("Pause")
         else:
@@ -47,6 +47,9 @@ class ShaderPlayground(QMainWindow):
         if self.settings.contains("Splitter_geometry"):
             self.centralWidget().splitter.restoreState(self.settings.value("Splitter_geometry"))
         self.settings.endGroup()
+
+        # Support screen pixel ratio, (High DPI)
+        self.centralWidget().player.set_screen_pixel_ratio(self.devicePixelRatioF())
 
         if preloaded_shader != '':
             self.current_filename = preloaded_shader
