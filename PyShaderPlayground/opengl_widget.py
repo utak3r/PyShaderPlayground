@@ -62,6 +62,10 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         self.timer_.timeout.connect(self.timer_tick)
         self.set_animation_speed(1.0, 30)
         self.timer_.start()
+        self.pixel_ratio = 1.0
+
+    def set_screen_pixel_ratio(self, ratio:float):
+        self.pixel_ratio = ratio
 
     def set_animation_speed(self, speed: float=1.0, framerate: float=50):
         """ How many "ones" per second? And what's a desired framerate? """
@@ -72,6 +76,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
     def timer_tick(self):
         """ Increment self.global_time variable for animating. """
         self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * (1.0 / self.framerate_))
+        self.update()
 
     def animation_framerate(self):
         """ Returns current animation's framerate. """
@@ -104,12 +109,14 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
     def animation_rewind(self):
         """ Rewinds the animation by resetting the global timer counter. """
         self.global_time = 0.0
+        self.update()
 
     def set_animation_speed_modifier(self, value):
         """ Temporary animation speed changing. """
         self.anim_speed_modifier_ = value
         if value != 1.0 and not self.is_playing():
             self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * (1.0 / self.framerate_))
+        self.update()
 
     def increment_animation(self, frames: int):
         """ Advance animation for given frames number. """
@@ -192,6 +199,12 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
             self.program_.link()
             self.program_.bind()
 
+            # for debug:
+            """ with open('fragment_vertex.temp.glsl', 'w') as f:
+                f.write(self.shader_vertex_.sourceCode().toStdString())
+            with open('fragment_shader.temp.glsl', 'w') as f:
+                f.write(self.shader_fragment_.sourceCode().toStdString()) """
+
             self.attrib_position = self.program_.attributeLocation("position")
             self.uniform_iGlobalTime = self.program_.uniformLocation("iGlobalTime")
             self.uniform_iResolution = self.program_.uniformLocation("iResolution")
@@ -230,7 +243,10 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
 
         self.program_.bind()
         self.program_.setUniformValue(self.uniform_iGlobalTime, self.global_time, 0.0)
-        self.program_.setUniformValue(self.uniform_iResolution, float(self.width_), float(self.height_), 0.0)
+        self.program_.setUniformValue(self.uniform_iResolution, 
+                                      float(self.width_) * self.pixel_ratio, 
+                                      float(self.height_) * self.pixel_ratio, 
+                                      0.0)
         self.program_.setUniformValue(self.uniform_iMouse, self.mouse[0], self.mouse[1], self.mouse[2], self.mouse[3])        
         self.texture_0_.set_position(self.global_time)
         if self.texture_0_.can_be_binded():
@@ -249,8 +265,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         self.program_.release()
         self.glDisable(gl.GL_DEPTH_TEST)
         self.glDisable(gl.GL_CULL_FACE)
-        self.update()
-
+        #self.update()
 
     def render_image(self, filename: str, width: int, height: int):
         """ Offscreen rendering with a specified size, saved to a file. """
@@ -261,7 +276,14 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         # save screen rendering size
         orig_width = self.width_
         orig_height = self.height_
-        dummy_img = self.grabFramebuffer()
+        orig_pixel_ratio = self.pixel_ratio
+        self.pixel_ratio = 1.0
+        # Ok, here's the thing...
+        # Without below current screen buffer grab...
+        # following FBO doesn't work as expected??!
+        # WTF...
+        fbImage = self.grabFramebuffer()
+        #fbImage.save(f'{name}_screenbuffer.{ext}', img_type, 95)
         # create an offscreen frame buffer
         buffer = QOpenGLFramebufferObject(width, height)
         if buffer.bind():
@@ -276,6 +298,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
             # restore screen rendering
             buffer.release()
             self.resizeGL(orig_width, orig_height)
+            self.pixel_ratio = orig_pixel_ratio
         else:
             print("ShaderWidget.render_image: Unable to switch rendering from screen to FBO.")
 
