@@ -251,7 +251,8 @@ class InputTextureSound(InputTexture):
         spectrum = np.linspace(start=min_value, stop=max_value, num=N)
         
         for i in range(0, N_spectrum):
-            magnitude = InputTextureSound.calculate_magnitude_db(signal_fft[i])
+            #magnitude = InputTextureSound.calculate_magnitude_db(signal_fft[i])
+            magnitude = np.log10(np.abs(signal_fft[i]))
             spectrum[i] = magnitude
         return spectrum
 
