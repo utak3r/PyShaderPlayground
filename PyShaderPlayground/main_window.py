@@ -16,13 +16,6 @@ class ShaderPlayground(QMainWindow):
         self.opengl = self.centralWidget().player
         self.syntax_highlighter = GLSLSyntaxHighlighter(self.centralWidget().txtShaderEditor.document())
 
-        self.settings = QSettings("ShaderPlayground.ini", QSettings.IniFormat)
-        self.settings.beginGroup("Geometry")
-        self.setGeometry(self.settings.value("MainWindowGeometry", QRect(320, 250, 1280, 540)))
-        if self.settings.contains("Splitter_geometry"):
-            self.centralWidget().splitter.restoreGeometry(self.settings.value("Splitter_geometry"))
-        self.settings.endGroup()
-
         self.centralWidget().txtShaderEditor.setText(self.opengl.get_shader())
         self.centralWidget().btnCompile.clicked.connect(self.compile_shader)
         self.centralWidget().btnLoadFile.clicked.connect(self.open_shader_from_file)
@@ -47,6 +40,13 @@ class ShaderPlayground(QMainWindow):
         self.centralWidget().texture0.clicked.connect(self.load_texture_0)
         self.centralWidget().texture1.clicked.connect(self.load_texture_1)
         self.runner = None
+
+        self.settings = QSettings("ShaderPlayground.ini", QSettings.IniFormat)
+        self.settings.beginGroup("Geometry")
+        self.setGeometry(self.settings.value("MainWindowGeometry", QRect(320, 250, 1280, 540)))
+        if self.settings.contains("Splitter_geometry"):
+            self.centralWidget().splitter.restoreState(self.settings.value("Splitter_geometry"))
+        self.settings.endGroup()
 
         if preloaded_shader != '':
             self.current_filename = preloaded_shader
@@ -82,7 +82,7 @@ class ShaderPlayground(QMainWindow):
         """ Closing the main window. """
         self.settings.beginGroup("Geometry")
         self.settings.setValue("MainWindowGeometry", self.geometry())
-        self.settings.setValue("Splitter_geometry", self.centralWidget().splitter.saveGeometry())
+        self.settings.setValue("Splitter_geometry", self.centralWidget().splitter.saveState())
         self.settings.endGroup()
         self.settings.sync()
         super().closeEvent(event)
