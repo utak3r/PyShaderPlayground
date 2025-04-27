@@ -135,15 +135,16 @@ class InputTextureSound(InputTexture):
         return np.ceil(self.duration_)
 
     @classmethod
-    def get_audio_part(cls, audio, time_start=0.0, sample_rate=44100, frame_rate=30, nframes = 1):
+    def get_audio_part(cls, audio, time_start=0.0, sample_rate=44100, frame_rate=30, time_span = 0.01):
         samples_per_frame = int(sample_rate / frame_rate)
         sample_start = int(time_start * sample_rate)
-        sample_end = sample_start + (nframes * samples_per_frame)
+        sample_end = int((time_start+time_span) * sample_rate)
+        #sample_end = sample_start + int(nframes * samples_per_frame)
         N = sample_end - sample_start
         T = 1.0 / sample_rate
-        t = np.linspace(0, nframes * (1.0 / frame_rate), int(sample_rate * nframes * (1.0 / frame_rate)))
+        #t = np.linspace(0, nframes * (1.0 / frame_rate), int(sample_rate * nframes * (1.0 / frame_rate)))
         audio_part = audio[sample_start:sample_end]
-        return (audio_part, N, T, t)
+        return (audio_part, N, T)
 
     @classmethod
     def array_to_red_image(cls, array) -> Image:
@@ -238,32 +239,32 @@ class InputTextureSound(InputTexture):
         '''so the magnitude values are 1/20 dB in fact.'''
         result = 0
         magnitude  = np.sqrt(np.pow(value.real, 2) + np.pow(value.imag, 2))
-        if magnitude < 1.0:
+        if magnitude < 0.2:
             result = 0.0
         else:
             result = np.log10(magnitude)
         return result
 
     @classmethod
-    def calculate_spectrum(cls, signal, min_value, max_value, N):
+    def calculate_spectrum(cls, signal, min_value=24, max_value=11800):
         signal_fft = np.fft.rfft(signal)
         N_spectrum = int(signal_fft.size/2)
-        spectrum = np.linspace(start=min_value, stop=max_value, num=N)
+        spectrum = np.logspace(start=min_value, stop=max_value, num=N_spectrum)
         
         for i in range(0, N_spectrum):
-            #magnitude = InputTextureSound.calculate_magnitude_db(signal_fft[i])
-            magnitude = np.log10(np.abs(signal_fft[i]))
+            magnitude = InputTextureSound.calculate_magnitude_db(signal_fft[i])
+            #magnitude = np.log10(np.abs(signal_fft[i])) # simple version
             spectrum[i] = magnitude
         return spectrum
 
     def prepare_texture(self, position: float):
-        audio_part, N, T, t = InputTextureSound.get_audio_part(self.audio_, time_start=position, sample_rate=self.sample_rate_, frame_rate=self.framerate_, nframes=1)
+        audio_part, N, T = InputTextureSound.get_audio_part(self.audio_, time_start=position, sample_rate=self.sample_rate_, frame_rate=self.framerate_, time_span=0.15)
         self.current_frame_ = int(position*self.framerate_)
 
         audio_wave_img = InputTextureSound.array_to_red_image(audio_part)
         audio_wave_img = InputTextureSound.transform_image(audio_wave_img, 90, 512, 1)
 
-        audio_spectrum = InputTextureSound.calculate_spectrum(audio_part, 0.0, (self.sample_rate_ / 4.0), int(N/4))
+        audio_spectrum = InputTextureSound.calculate_spectrum(audio_part)
         spectrogram_image = InputTextureSound.array_to_red_image(audio_spectrum)
         spectrogram_image = InputTextureSound.transform_image(spectrogram_image, 90, 512, 1)
 
