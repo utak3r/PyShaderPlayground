@@ -74,6 +74,8 @@ class VideoEncodingParams(QDialog):
         self.Form.cbxVideoResolutions.addItem(res.name, res.get_user_data())
         res = VideoResolution("2K DCI Full", 2048, 1080)
         self.Form.cbxVideoResolutions.addItem(res.name, res.get_user_data())
+        res = VideoResolution("2K QHD/WQHD", 2560, 1440)
+        self.Form.cbxVideoResolutions.addItem(res.name, res.get_user_data())
         res = VideoResolution("UltraHD 2160p", 3860, 2160)
         self.Form.cbxVideoResolutions.addItem(res.name, res.get_user_data())
         res = VideoResolution("4K DCI Full", 4096, 2160)
