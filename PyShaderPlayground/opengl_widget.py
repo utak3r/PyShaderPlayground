@@ -250,11 +250,11 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         self.program_.setUniformValue(self.uniform_iMouse, self.mouse[0], self.mouse[1], self.mouse[2], self.mouse[3])        
         self.texture_0_.set_position(self.global_time)
         if self.texture_0_.can_be_binded():
-            self.texture_0_.bind()
+            self.texture_0_.bind(0)
         self.program_.setUniformValue(self.uniform_iChannel0, int(0))
         self.texture_1_.set_position(self.global_time)
         if self.texture_1_.can_be_binded():
-            self.texture_1_.bind()
+            self.texture_1_.bind(1)
         self.program_.setUniformValue(self.uniform_iChannel1, int(1))
 
         self.program_.setAttributeArray(self.attrib_position, self.vertices_, 2, 0)
@@ -319,20 +319,21 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
 
     def set_texture(self, channel: int, image: str):
         """ Set texture nr 0 from given filename. """
-        if channel == 0:
-            if self.isValid():
+        if self.isValid():
+            self.makeCurrent()
+            if channel == 0:
                 file_ext = Path(image).suffix
                 if file_ext.casefold() == ".jpg" or file_ext.casefold() == ".png":
                     self.texture_0_ = InputTexture2D(image)
                 elif file_ext.casefold() == ".wav" or file_ext.casefold() == ".mp3":
                     self.texture_0_ = InputTextureSound(image)
-        elif channel == 1:
-            if self.isValid():
+            elif channel == 1:
                 file_ext = Path(image).suffix
                 if file_ext.casefold() == ".jpg" or file_ext.casefold() == ".png":
                     self.texture_1_ = InputTexture2D(image)
                 elif file_ext.casefold() == ".wav" or file_ext.casefold() == ".mp3":
                     self.texture_1_ = InputTextureSound(image)
+            self.doneCurrent()
 
     def get_texture(self, channel: int):
         if channel == 0:

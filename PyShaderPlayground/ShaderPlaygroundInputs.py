@@ -7,6 +7,7 @@ from scipy.fftpack import fft, ifft
 from scipy.signal.windows import hann
 import numpy as np
 import librosa
+import simpleaudio
 from PIL import Image
 import matplotlib.pyplot as plt
 #from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -73,8 +74,8 @@ class InputTexture():
     def can_be_binded(self):
         return False
 
-    def bind(self):
-        self.get_texture().bind()
+    def bind(self, unit: int = 0):
+        self.get_texture().bind(unit)
     
     def release(self):
         self.get_texture().release()
@@ -125,7 +126,8 @@ class InputTextureSound(InputTexture):
         self.max_sample_value_ = 0
         self.current_frame_ = 0
         self.thumbnail_ = None
-        #self.colormap_ = InputTextureSound.create_color_map()
+        self.filter_minification_ = TextureFilter.FILTER_LINEAR
+        self.filter_magnification_ = TextureFilter.FILTER_LINEAR
         self.create_texture(filename)
 
     def get_audio_duration(self):
@@ -135,60 +137,18 @@ class InputTextureSound(InputTexture):
         return np.ceil(self.duration_)
 
     @classmethod
-    def get_audio_part(cls, audio, time_start=0.0, sample_rate=44100, frame_rate=30, time_span = 0.01):
-        samples_per_frame = int(sample_rate / frame_rate)
+    def get_audio_part(cls, audio, time_start=0.0, sample_rate=44100, num_samples=512):
         sample_start = int(time_start * sample_rate)
-        sample_end = int((time_start+time_span) * sample_rate)
-        #sample_end = sample_start + int(nframes * samples_per_frame)
-        N = sample_end - sample_start
-        T = 1.0 / sample_rate
-        #t = np.linspace(0, nframes * (1.0 / frame_rate), int(sample_rate * nframes * (1.0 / frame_rate)))
-        audio_part = audio[sample_start:sample_end]
-        return (audio_part, N, T)
-
-    @classmethod
-    def array_to_red_image(cls, array) -> Image:
-        img = None
-        # get absolute values
-        array = abs(array)
-        # get max value
-        max = np.max(array)
-        # normalize to 0.0 - 1.0 range
-        if max > 0:
-            arrayuint8 = array.astype(np.float64) / max
+        sample_end = sample_start + num_samples
+        
+        # Handle padding if we reach the end of the audio
+        if sample_end > len(audio):
+            audio_part = audio[sample_start:]
+            audio_part = np.pad(audio_part, (0, num_samples - len(audio_part)), 'constant')
         else:
-            arrayuint8 = array.astype(np.float64)
-        # make it uint8 data
-        arrayuint8 = 255 * arrayuint8
-        # grey image from array
-        img = Image.fromarray(arrayuint8.astype(np.uint8), mode='L')
-        # empty grey image
-        zero = np.zeros(array.shape, dtype=np.uint8)
-        img_zero = Image.fromarray(zero, mode='L')
-        # merge it. Real image goes to R channel, while G and B channels filled with zeroes
-        img = Image.merge(mode='RGB', bands=(img, img_zero, img_zero))
-        return img
-    
-    @classmethod
-    def array_to_rgb_image(cls, array) -> Image:
-        img = None
-        return img
-
-    @classmethod
-    def merge_images(cls, img1: Image, img2: Image):
-        img = None
-        final_width = np.max([img1.size[0], img2.size[0]])
-        final_height = img1.size[1] + img2.size[1]
-        img = Image.new('RGB', size=(final_width, final_height))
-        img.paste(img1, (0, 0))
-        img.paste(img2, (0, img1.size[1]))
-        return img
-    
-    @classmethod
-    def transform_image(cls, img: Image, rotation=0.0, width=1024, height=1024):
-        img_out = img.rotate(rotation, expand=True)
-        img_out = img_out.resize((width, height))
-        return img_out
+            audio_part = audio[sample_start:sample_end]
+            
+        return audio_part
 
     @classmethod
     def wave_to_pixmap(cls, signal, sr, width, height) -> Image:
@@ -201,8 +161,6 @@ class InputTextureSound(InputTexture):
         fig.tight_layout()
         canvas.draw()
         buffer_rgba = canvas.buffer_rgba()
-        img = QImage(buffer_rgba, buffer_rgba.shape[1], buffer_rgba.shape[0],
-                                  QImage.Format.Format_RGBA8888)
         pixmap = QPixmap(
             QImage(
                 buffer_rgba, 
@@ -213,15 +171,15 @@ class InputTextureSound(InputTexture):
         plt.close(fig)
         return pixmap
 
-    @classmethod
-    def image_to_qimage(cls, image, width, height) -> QImage:
-        return QImage(image.tobytes(), width, height, width*3, QImage.Format_RGB888)
-
     def create_texture(self, filename: str):
         super().create_texture()
         self.filename_ = filename
-        # We're NOT resampling the source, leaving the original sample reate.
-        # Also, we're loading it as a mono sound.
+        
+        self.texture_.setSize(512, 2)
+        self.texture_.setFormat(QOpenGLTexture.TextureFormat.R8_UNorm)
+        self.texture_.setMipLevels(1)
+        self.texture_.allocateStorage()
+
         INPUT_SAMPLE_RATE = None
         self.audio_, self.sample_rate_ = librosa.load(self.filename_, mono=True, sr=INPUT_SAMPLE_RATE)
         num_samples = self.audio_.shape[0]
@@ -229,50 +187,83 @@ class InputTextureSound(InputTexture):
         self.max_sample_value_ = np.max(self.audio_)
 
         self.thumbnail_ = InputTextureSound.wave_to_pixmap(self.audio_, self.sample_rate_, 100, 100)
-        self.texture_.setData(self.prepare_texture(0.0))
-
-    @classmethod
-    def calculate_magnitude_db(cls, value):
-        '''Calculate magnitude of a complex value and scale it in dB.'''
-        '''Do some simplifying things, like zeroing some values before log10.'''
-        '''Also note, we're not multiplying it by 20, as it will be rescaled afterwards anyway,'''
-        '''so the magnitude values are 1/20 dB in fact.'''
-        result = 0
-        magnitude  = np.sqrt(np.pow(value.real, 2) + np.pow(value.imag, 2))
-        if magnitude < 0.2:
-            result = 0.0
-        else:
-            result = np.log10(magnitude)
-        return result
-
-    @classmethod
-    def calculate_spectrum(cls, signal, min_value=24, max_value=11800):
-        signal_fft = np.fft.rfft(signal)
-        N_spectrum = int(signal_fft.size/2)
-        spectrum = np.logspace(start=min_value, stop=max_value, num=N_spectrum)
         
-        for i in range(0, N_spectrum):
-            magnitude = InputTextureSound.calculate_magnitude_db(signal_fft[i])
-            #magnitude = np.log10(np.abs(signal_fft[i])) # simple version
-            spectrum[i] = magnitude
-        return spectrum
+        self.texture_.setData(QOpenGLTexture.PixelFormat.Red, 
+                             QOpenGLTexture.PixelType.UInt8, 
+                             self.prepare_texture(0.0))
+
+        # # Playable audio (Stereo if available, native SR for best quality)
+        # self.audio_playable, native_sr = librosa.load(self.filename_, sr=None, mono=False)
+        
+        # # Normalize to int16 range to avoid clipping and ensure audible volume
+        # max_val = np.max(np.abs(self.audio_playable))
+        # if max_val > 0:
+        #     self.audio_playable = self.audio_playable / max_val * 32767
+        
+        # self.audio_playable = self.audio_playable.astype(np.int16)
+        
+        # # Simpleaudio expects (samples, channels) for multi-channel
+        # if self.audio_playable.ndim > 1:
+        #     # librosa returns (channels, samples), simpleaudio wants (samples, channels)
+        #     self.audio_playable = np.ascontiguousarray(self.audio_playable.T)
+        #     num_channels = self.audio_playable.shape[1]
+        # else:
+        #     num_channels = 1
+            
+        # self.audio_play_object = simpleaudio.WaveObject(self.audio_playable, 
+        #                                                 num_channels=num_channels, 
+        #                                                 bytes_per_sample=2, 
+        #                                                 sample_rate=int(native_sr))
+        # self.audio_play_playback = None
+
+    def play_audio(self):
+        return
+        # if self.audio_play_playback:
+        #     if self.audio_play_playback.is_playing():
+        #         self.audio_play_playback.stop()
+        #         self.audio_play_playback.wait_done()
+        #         self.audio_play_playback = None
+        #     else:
+        #         self.audio_play_playback = self.audio_play_object.play()
+        # else:
+        #     self.audio_play_playback = self.audio_play_object.play()
+
+    @classmethod
+    def calculate_spectrum(cls, signal):
+        # Windowed FFT of 2048 samples to get 1024 bins,
+        # Take first 512 bins (0 to 11025 Hz).
+        
+        window = np.hanning(len(signal))
+        windowed_signal = signal * window
+        
+        fft_res = np.fft.rfft(windowed_signal)
+        
+        magnitude = np.abs(fft_res)
+        
+        # Normalize
+        magnitude = magnitude / 32.0 
+        
+        return magnitude[:512]
 
     def prepare_texture(self, position: float):
-        audio_part, N, T = InputTextureSound.get_audio_part(self.audio_, time_start=position, sample_rate=self.sample_rate_, frame_rate=self.framerate_, time_span=0.15)
-        self.current_frame_ = int(position*self.framerate_)
-
-        audio_wave_img = InputTextureSound.array_to_red_image(audio_part)
-        audio_wave_img = InputTextureSound.transform_image(audio_wave_img, 90, 512, 1)
-
-        audio_spectrum = InputTextureSound.calculate_spectrum(audio_part)
-        spectrogram_image = InputTextureSound.array_to_red_image(audio_spectrum)
-        spectrogram_image = InputTextureSound.transform_image(spectrogram_image, 90, 512, 1)
-
-        final_img = InputTextureSound.merge_images(spectrogram_image, audio_wave_img)
-        final_width, final_height = final_img.size
-        texture = QImage(final_img.tobytes(), final_width, final_height, final_width*3, QImage.Format_RGB888)
-        #texture.save('final_texture.jpg')
-        return texture
+        wave_samples = InputTextureSound.get_audio_part(self.audio_, position, self.sample_rate_, 512)
+        fft_samples = InputTextureSound.get_audio_part(self.audio_, position, self.sample_rate_, 2048)
+        
+        spectrum = InputTextureSound.calculate_spectrum(fft_samples)
+        
+        # Normalize Waveform: -1..1 -> 0..1 (0.5 is silence)
+        wave_norm = (wave_samples + 1.0) / 2.0
+        wave_norm = np.clip(wave_norm, 0.0, 1.0)
+        
+        # Normalize Spectrum: 0..? -> 0..1
+        spec_norm = np.clip(spectrum, 0.0, 1.0)
+        
+        # Build texture
+        data = np.zeros((2, 512), dtype=np.uint8)
+        data[0, :] = (spec_norm * 255).astype(np.uint8)
+        data[1, :] = (wave_norm * 255).astype(np.uint8)
+        
+        return data.tobytes()
 
     def set_position(self, position: float):
         if DEBUG_USE_SET_AUDIO_POSITION:
@@ -280,10 +271,10 @@ class InputTextureSound(InputTexture):
         if position <= self.get_audio_duration() and position >= 0.0:
             if position != self.current_position_:
                 if self.is_texture_created():
-                    super().destroy_texture()
-                    super().create_texture()
-                self.texture_.setData(self.prepare_texture(position))
-                self.current_position_ = position
+                    self.texture_.setData(QOpenGLTexture.PixelFormat.Red, 
+                                         QOpenGLTexture.PixelType.UInt8, 
+                                         self.prepare_texture(position))
+                    self.current_position_ = position
 
     def get_thumbnail(self) -> QPixmap:
         pixmap = None
@@ -296,4 +287,3 @@ class InputTextureSound(InputTexture):
 
     def can_be_binded(self):
         return True
-

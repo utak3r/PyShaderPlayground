@@ -2,12 +2,17 @@ import pytest
 import numpy as np
 from PyShaderPlayground.ShaderPlaygroundInputs import InputTextureSound
 
-magnitude_test_data = [
-    (1.0, 0.0), (1.0j, 0.0), (0.0, 0.0), (0.2+0.1j, 0.0),
-    (-1.0, 0.0), (-1.0j, 0.0), (0.0, 0.0), (-0.2+0.1j, 0.0),
-    (8.0+6.0j, 1.0), (8.0-6.0j, 1.0), (-8.0+6.0j, 1.0), (-8.0-6.0j, 1.0),
-    (80.0+60.0j, 2.0), (80.0-60.0j, 2.0), (-80.0+60.0j, 2.0), (-80.0-60.0j, 2.0)
-]
-@pytest.mark.parametrize("x, expected", magnitude_test_data)
-def test_magnitude_db(x, expected):
-    assert InputTextureSound.calculate_magnitude_db(x) == expected
+def test_calculate_spectrum_shape():
+    # Test that calculate_spectrum returns 512 bins for a 2048 sample input
+    signal = np.random.rand(2048)
+    spectrum = InputTextureSound.calculate_spectrum(signal)
+    assert len(spectrum) == 512
+    assert np.all(spectrum >= 0.0)
+
+def test_get_audio_part_padding():
+    # Test that get_audio_part pads with zeros if at the end
+    audio = np.ones(100)
+    part = InputTextureSound.get_audio_part(audio, time_start=0.0, sample_rate=100, num_samples=200)
+    assert len(part) == 200
+    assert np.all(part[:100] == 1.0)
+    assert np.all(part[100:] == 0.0)

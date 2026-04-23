@@ -141,6 +141,10 @@ class ShaderPlayground(QMainWindow):
     def play_pause_animation(self):
         """ Play/Pause animation. """
         self.opengl.animation_play_pause()
+        # if isinstance(self.opengl.get_texture(0), InputTextureSound):
+        #     self.opengl.get_texture(0).play_audio()
+        # if isinstance(self.opengl.get_texture(1), InputTextureSound):
+        #     self.opengl.get_texture(1).play_audio()
         if self.opengl.is_playing():
             self.centralWidget().btnPlayPause.setText("Pause")
         else:
