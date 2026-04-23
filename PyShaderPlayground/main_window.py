@@ -1,4 +1,4 @@
-from PySide6.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo, QSettings, QRect
+from PySide6.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo, QSettings, QRect, QTimer
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel, QSplitterHandle, QHBoxLayout, QFrame, QProgressBar, QProgressDialog
 from PySide6.QtGui import QPixmap, QImage
 from PySide6.QtUiTools import QUiLoader
@@ -11,7 +11,7 @@ from PyShaderPlayground.ShaderPlaygroundInputs import InputTexture2D, InputTextu
 from os import path
 
 class ShaderPlayground(QMainWindow):
-    def __init__(self, preloaded_shader: str = ''):
+    def __init__(self, preloaded_shader: str = '', preloaded_texture: str = ''):
         QMainWindow.__init__(self)
         self.init_ui(path.abspath(path.join(path.dirname(__file__), 'ShaderPlayground.ui')))
         self.opengl = self.centralWidget().player
@@ -52,9 +52,9 @@ class ShaderPlayground(QMainWindow):
         # Support screen pixel ratio, (High DPI)
         self.centralWidget().player.set_screen_pixel_ratio(self.devicePixelRatioF())
 
-        if preloaded_shader != '':
-            self.current_filename = preloaded_shader
-            self.read_shader_from_file(preloaded_shader)
+        self.preloaded_shader = preloaded_shader
+        self.preloaded_texture = preloaded_texture
+        QTimer.singleShot(1000, self.after_startup)
 
 
     def init_ui(self, filename):
@@ -81,6 +81,14 @@ class ShaderPlayground(QMainWindow):
             line.setLineWidth(1)
             layout.addWidget(line)
 
+    @Slot()
+    def after_startup(self):
+        if self.preloaded_shader != '':
+            self.current_filename = self.preloaded_shader
+            self.read_shader_from_file(self.preloaded_shader)
+            self.compile_shader()
+        if self.preloaded_texture != '':
+           self.set_texture(0, self.preloaded_texture)
 
     def closeEvent(self, event):
         """ Closing the main window. """

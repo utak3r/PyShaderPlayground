@@ -13,9 +13,11 @@ def parse_command_line(app):
     parser.addHelpOption()
     parser.addVersionOption()
     parser.addOption(QCommandLineOption(['s', 'shader'], 'Load specified shader at startup.', 'filename', ''))
+    parser.addOption(QCommandLineOption(['t', 'texture'], 'Load specified texture at startup.', 'filename', ''))
     parser.process(app)
     loadshader_filename = parser.value('shader')
-    return (loadshader_filename)
+    loadtexture_filename = parser.value('texture')
+    return (loadshader_filename, loadtexture_filename)
 
 
 if __name__ == "__main__":
@@ -29,12 +31,14 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setApplicationName("Shader Playground")
     app.setApplicationVersion("1.0")
-    app.setWindowIcon(QIcon('app.ico'))
+    icon_file = os.path.abspath(os.path.join(os.path.dirname(__file__), '../PyShaderPlayground.ico'))
+    app.setWindowIcon(QIcon(icon_file))
 
-    loadshader_filename = parse_command_line(app)
+    (loadshader_filename, loadtexture_filename) = parse_command_line(app)
     print(f'Requested shader for preloading: {loadshader_filename}')
+    print(f'Requested texture for preloading: {loadtexture_filename}')
 
-    mainWnd = ShaderPlayground(loadshader_filename)
+    mainWnd = ShaderPlayground(loadshader_filename, loadtexture_filename)
     mainWnd.show()
 
     sys.exit(app.exec())
