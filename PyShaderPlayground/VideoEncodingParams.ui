@@ -150,10 +150,10 @@
          <item>
           <widget class="QSpinBox" name="Framerate">
            <property name="minimum">
-            <number>24</number>
+            <number>1</number>
            </property>
            <property name="maximum">
-            <number>120</number>
+            <number>240</number>
            </property>
            <property name="value">
             <number>30</number>

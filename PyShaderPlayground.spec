@@ -4,7 +4,8 @@ added_files = [
  	( 'PyShaderPlayground/ShaderPlayground.ui', 'PyShaderPlayground' ),
  	( 'PyShaderPlayground/VideoEncodingParams.ui', 'PyShaderPlayground' ),
  	( 'PyShaderPlayground/ResolutionDialog.ui', 'PyShaderPlayground' ),
- 	( 'PyShaderPlayground/ProcessRunner.ui', 'PyShaderPlayground' )
+ 	( 'PyShaderPlayground/ProcessRunner.ui', 'PyShaderPlayground' ),
+    ( 'PyShaderPlayground.ico', '.' )
 ]
 
 a = Analysis(
@@ -29,6 +30,7 @@ exe = EXE(
     a.datas,
     [],
     name='PyShaderPlayground',
+    icon='./PyShaderPlayground.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

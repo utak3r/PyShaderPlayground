@@ -37,7 +37,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         self.global_time: float = 0.0
         self.mouse = [0.0, 0.0, 0.0, 0.0]
         self.framerate_ = 50
-        self.anim_speed_ = 2.0
+        self.anim_speed_ = 1.0
         self.anim_speed_modifier_ = 1.0
         self.shader_template_pre_ = ""
         self.shader_template_post_ = ""
@@ -54,13 +54,15 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
             "}\n"
         self.shader_fallback_ = ""
         
-        self.vertices_ = [ -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0 ]
+        self.vertices_ = [ -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0 ]
+        #self.vertices_ = [ -0.8, 0.8, 0.8, 0.8, -0.8, -0.8, 0.8, -0.8 ] # for debug reasons, not a full screen
         self.resize(self.width_, self.height_)
 
         self.timer_ = QTimer(self)
         self.timer_.timeout.connect(self.timer_tick)
-        self.set_animation_speed(2.0, 50)
-        self.timer_.start()
+        self.set_animation_speed(1.0, 30)
+        # self.timer_.start()
+        self.animation_play()
         self.pixel_ratio = 1.0
 
     def set_screen_pixel_ratio(self, ratio:float):
@@ -74,7 +76,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
 
     def timer_tick(self):
         """ Increment self.global_time variable for animating. """
-        self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * self.framerate_ / 1000.0)
+        self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * (1.0 / self.framerate_))
         self.update()
 
     def animation_framerate(self):
@@ -95,10 +97,18 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
     def animation_pause(self):
         """ Pause animation. """
         self.timer_.stop()
+        if isinstance(self.texture_0_, InputTextureSound):
+            self.texture_0_.play_audio()
+        if isinstance(self.texture_1_, InputTextureSound):
+            self.texture_1_.play_audio()
 
     def animation_play(self):
         """ Play animation. """
         self.timer_.start()
+        if isinstance(self.texture_0_, InputTextureSound):
+            self.texture_0_.play_audio()
+        if isinstance(self.texture_1_, InputTextureSound):
+            self.texture_1_.play_audio()
     
     def animation_stop(self):
         """ Stop and rewind. """
@@ -114,12 +124,12 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         """ Temporary animation speed changing. """
         self.anim_speed_modifier_ = value
         if value != 1.0 and not self.is_playing():
-            self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * self.framerate_ / 1000.0)
+            self.global_time = self.global_time + (self.anim_speed_modifier_ * self.anim_speed_ * (1.0 / self.framerate_))
         self.update()
 
     def increment_animation(self, frames: int):
         """ Advance animation for given frames number. """
-        self.global_time = self.global_time + frames * (self.anim_speed_ * self.framerate_ / 1000.0)
+        self.global_time = self.global_time + frames * (self.anim_speed_ * (1.0 / self.framerate_))
 
     def initializeGL(self):
         """ Initialize OpenGL and related things. """
@@ -129,17 +139,17 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
 
         self.shader_vertex_ = QOpenGLShader(QOpenGLShader.Vertex)
         self.shader_vertex_.compileSourceCode(
-            "#version 150\n" +
+            "#version 330 core\n" +
             "attribute vec3 position;\n" +
             "void main()\n" +
             "{\n" +
-            "gl_Position = vec4(position, 1.0);\n" +
+            "gl_Position = vec4(position, 1.0f);\n" +
             "}\n"
         )
         self.shader_fragment_ = QOpenGLShader(QOpenGLShader.Fragment)
 
         self.shader_template_pre_ = \
-            "#version 150\n" \
+            "#version 330 core\n" \
             "uniform vec3 iResolution;				// The viewport resolution (z is pixel aspect ratio, usually 1.0)\n" \
             "uniform vec2 iGlobalTime;				// shader playback time (in seconds)\n" \
             "uniform vec4 iMouse;                   // mouse pixel coords. xy: current (if MLB down), zw: click\n" \
@@ -180,7 +190,8 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
 
     def set_shader(self, user_shader: str):
         """ Replace part of the fragment shader. """
-        self.timer_.stop()
+        # self.timer_.stop()
+        self.animation_pause()
         self.global_time = 0.0
 
         self.makeCurrent()
@@ -211,7 +222,8 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
             self.uniform_iChannel0 = self.program_.uniformLocation("iChannel0")
             self.uniform_iChannel1 = self.program_.uniformLocation("iChannel1")
 
-        self.timer_.start()
+        # self.timer_.start()
+        self.animation_play()
         self.program_.release()
         self.doneCurrent()
 
@@ -235,7 +247,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         self.glClearColor(0.0, 0.0, 0.0, 1.0)
         self.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
 
-        self.glFrontFace(gl.GL_CW)
+        self.glFrontFace(gl.GL_CCW)
         self.glCullFace(gl.GL_FRONT)
         self.glEnable(gl.GL_CULL_FACE)
         self.glEnable(gl.GL_DEPTH_TEST)
@@ -249,11 +261,11 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         self.program_.setUniformValue(self.uniform_iMouse, self.mouse[0], self.mouse[1], self.mouse[2], self.mouse[3])        
         self.texture_0_.set_position(self.global_time)
         if self.texture_0_.can_be_binded():
-            self.texture_0_.get_texture().bind()
+            self.texture_0_.bind(0)
         self.program_.setUniformValue(self.uniform_iChannel0, int(0))
         self.texture_1_.set_position(self.global_time)
         if self.texture_1_.can_be_binded():
-            self.texture_1_.get_texture().bind()
+            self.texture_1_.bind(1)
         self.program_.setUniformValue(self.uniform_iChannel1, int(1))
 
         self.program_.setAttributeArray(self.attrib_position, self.vertices_, 2, 0)
@@ -318,20 +330,21 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
 
     def set_texture(self, channel: int, image: str):
         """ Set texture nr 0 from given filename. """
-        if channel == 0:
-            if self.isValid():
+        if self.isValid():
+            self.makeCurrent()
+            if channel == 0:
                 file_ext = Path(image).suffix
                 if file_ext.casefold() == ".jpg" or file_ext.casefold() == ".png":
                     self.texture_0_ = InputTexture2D(image)
-                elif file_ext.casefold() == ".wav":
+                elif file_ext.casefold() == ".wav" or file_ext.casefold() == ".mp3":
                     self.texture_0_ = InputTextureSound(image)
-        elif channel == 1:
-            if self.isValid():
+            elif channel == 1:
                 file_ext = Path(image).suffix
                 if file_ext.casefold() == ".jpg" or file_ext.casefold() == ".png":
                     self.texture_1_ = InputTexture2D(image)
-                elif file_ext.casefold() == ".wav":
+                elif file_ext.casefold() == ".wav" or file_ext.casefold() == ".mp3":
                     self.texture_1_ = InputTextureSound(image)
+            self.doneCurrent()
 
     def get_texture(self, channel: int):
         if channel == 0:

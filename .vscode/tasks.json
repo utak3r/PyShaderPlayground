@@ -7,6 +7,12 @@
             "command": "pyinstaller --clean PyShaderPlayground.spec",
             "group": "build"
         },
+        {
+            "label": "Jupyter notebooks to MarkDown",
+            "type": "shell",
+            "command": "jupyter nbconvert ./experiments/*.ipynb --to markdown",
+            "group": "build"
+        }
     ]
 
 

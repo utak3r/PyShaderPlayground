@@ -1,18 +1,21 @@
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtOpenGL import QOpenGLTexture
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from enum import Enum
 from pathlib import Path
-from scipy.io import wavfile as wav
-from scipy.fftpack import fft, fftfreq
+from scipy.fftpack import fft, ifft
+from scipy.signal.windows import hann
 import numpy as np
+import librosa
+import simpleaudio
+from PIL import Image
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
-from matplotlib import colors as clrs
-from skimage.transform import resize
-from skimage import exposure
+#from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import FigureCanvas
 
+DEBUG_USE_SET_AUDIO_POSITION = False
+DEBUG_AUDIO_POSITION = 14.0
 
 class TextureFilter(Enum):
     """ Enum for texture filtering. """
@@ -38,15 +41,31 @@ class InputTexture():
         self.filter_magnification_ = TextureFilter.FILTER_LINEAR
         self.wrapping_ = TextureWrapMode.WRAP_CLAMP_TO_EDGE
         self.filename_ = ""
+        self.current_position_ = 0
 
     def get_texture(self) -> QOpenGLTexture:
         return self.texture_
+    
+    def get_texture_filename(self) -> str:
+        return self.filename_
 
     def create_texture(self):
         self.texture_ = QOpenGLTexture(QOpenGLTexture.Target2D)
         self.texture_.setMinificationFilter(self.filter_minification_.value)
         self.texture_.setMagnificationFilter(self.filter_magnification_.value)
         self.texture_.setWrapMode(self.wrapping_.value)
+    
+    def is_texture_created(self) -> bool:
+        created = False
+        if self.texture_:
+            if self.texture_.isCreated():
+                created = True
+        return created
+    
+    def destroy_texture(self):
+        if self.texture_:
+            if self.texture_.isCreated():
+                self.texture_.destroy()
 
     def get_thumbnail(self) -> QPixmap:
         pixmap = QPixmap(100, 100)
@@ -55,6 +74,15 @@ class InputTexture():
 
     def can_be_binded(self):
         return False
+
+    def bind(self, unit: int = 0):
+        self.get_texture().bind(unit)
+    
+    def release(self):
+        self.get_texture().release()
+    
+    def is_bound(self) -> bool:
+        return self.get_texture().isBound()
 
     def set_position(self, position: float):
         return True
@@ -95,112 +123,141 @@ class InputTextureSound(InputTexture):
         self.audio_ = None
         self.sample_rate_ = 1
         self.framerate_ = 1
-        self.length_ = 0
+        self.duration_ = 0
         self.max_sample_value_ = 0
         self.current_frame_ = 0
         self.thumbnail_ = None
-        self.colormap_ = InputTextureSound.create_color_map()
+        self.filter_minification_ = TextureFilter.FILTER_LINEAR
+        self.filter_magnification_ = TextureFilter.FILTER_LINEAR
         self.create_texture(filename)
 
-    @staticmethod
-    def create_color_map():
-        reds = plt.get_cmap('Reds', 256)
-        black_reds = reds(np.linspace(0, 1, 256))
-        for i in range(256):
-            black_reds[i:i+1, :] = np.array([i/256, 0, 0, 1])
-        map_black_reds = clrs.ListedColormap(black_reds)
-        return map_black_reds
+    def get_audio_duration(self):
+        return self.duration_
 
-    def create_texture(self, filename: str):
-        super().create_texture()
-        self.filename_ = filename
-        self.sample_rate_, self.audio_ = wav.read(self.filename_)
-        if self.audio_.ndim > 1:
-            self.audio_ = np.mean(self.audio_, axis=1) # we want mono!
-        num_samples = self.audio_.shape[0]
-        self.length_ = num_samples / self.sample_rate_
-        self.max_sample_value_ = np.max(self.audio_)
+    def get_audio_duration_ceiling(self):
+        return np.ceil(self.duration_)
 
-        fig=plt.figure(figsize=(1.0, 1.0), dpi=100)
+    @classmethod
+    def get_audio_part(cls, audio, time_start=0.0, sample_rate=44100, num_samples=512):
+        sample_start = int(time_start * sample_rate)
+        sample_end = sample_start + num_samples
+        
+        # Handle padding if we reach the end of the audio
+        if sample_end > len(audio):
+            audio_part = audio[sample_start:]
+            audio_part = np.pad(audio_part, (0, num_samples - len(audio_part)), 'constant')
+        else:
+            audio_part = audio[sample_start:sample_end]
+            
+        return audio_part
+
+    @classmethod
+    def wave_to_pixmap(cls, signal, sr, width, height) -> Image:
+        fig = plt.figure(figsize=(width/100.0, height/100.0), dpi=100)
         canvas = FigureCanvas(fig)
         ax = plt.axes()
         ax.set_axis_off()
         ax.margins(0)
-        ax.plot(np.arange(num_samples) / self.sample_rate_, self.audio_)
+        ax.plot(np.arange(signal.size) / sr, signal)
         fig.tight_layout()
-        thumb_file = f"{self.filename_}_thumbnail_temp.png"
-
         canvas.draw()
-        img = np.fromstring(canvas.tostring_rgb(), dtype='uint8').reshape(100, 100, 3)
-        img2 = QImage(img.data, 100, 100, QImage.Format_Indexed8)
-
-        #plt.savefig(thumb_file, dpi=fig.dpi)
+        buffer_rgba = canvas.buffer_rgba()
+        pixmap = QPixmap(
+            QImage(
+                buffer_rgba, 
+                buffer_rgba.shape[1], 
+                buffer_rgba.shape[0], 
+                QImage.Format.Format_RGBA8888
+                ).scaled(width, height, Qt.IgnoreAspectRatio))
         plt.close(fig)
-        #self.thumbnail_ = QPixmap(QImage(thumb_file))
-        self.thumbnail_ = QPixmap(img2)
-        #Path(thumb_file).unlink()
-        self.texture_.setData(self.prepare_texture(0.0))
+        return pixmap
+
+    def create_texture(self, filename: str):
+        super().create_texture()
+        self.filename_ = filename
+        
+        self.texture_.setSize(512, 2)
+        self.texture_.setFormat(QOpenGLTexture.TextureFormat.R8_UNorm)
+        self.texture_.setMipLevels(1)
+        self.texture_.allocateStorage()
+
+        INPUT_SAMPLE_RATE = None
+        self.audio_, self.sample_rate_ = librosa.load(self.filename_, mono=True, sr=INPUT_SAMPLE_RATE)
+        num_samples = self.audio_.shape[0]
+        self.duration_ = num_samples / self.sample_rate_
+        self.max_sample_value_ = np.max(self.audio_)
+
+        self.thumbnail_ = InputTextureSound.wave_to_pixmap(self.audio_, self.sample_rate_, 100, 100)
+        
+        self.texture_.setData(QOpenGLTexture.PixelFormat.Red, 
+                             QOpenGLTexture.PixelType.UInt8, 
+                             self.prepare_texture(0.0))
+
+        self.load_playable_audio(self.filename_)
+
+
+    def load_playable_audio(self, filename):
+        self.audio_player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.audio_player.setAudioOutput(self.audio_output)
+        self.audio_player.setSource(QUrl.fromLocalFile(filename))
+
+    def play_audio(self):
+        if self.audio_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            self.audio_player.stop()
+        else:
+            self.audio_player.setPosition(int(self.current_position_ * 1000))
+            self.audio_player.play()
+
+    @classmethod
+    def calculate_spectrum(cls, signal):
+        # Windowed FFT (Hann filter) of 2048 samples to get 1024 bins,
+        # Take first 512 bins (0 to 11025 Hz).
+        window = np.hanning(len(signal))
+        windowed_signal = signal * window
+        fft_res = np.fft.rfft(windowed_signal)
+        
+        magnitude = np.abs(fft_res)[:512]
+
+        # Flatten and rescale into 0..1 range
+        magnitude = np.log10(magnitude + 1.0)
+        magrange = np.max(magnitude) - np.min(magnitude)
+        magnitude -= np.min(magnitude)
+        magnitude /= magrange
+                
+        return magnitude[:512]
 
     def prepare_texture(self, position: float):
-        current_frame = int(position*self.framerate_)
-        sample_start = int(current_frame / self.framerate_ * self.sample_rate_)
-        sample_end = int((current_frame + 1) / self.framerate_ * self.sample_rate_)
-        N = sample_end - sample_start
-        T = 1.0 / self.sample_rate_
-        audio_part = self.audio_[sample_start:sample_end]
-
-        fig=plt.figure(figsize=(5.12, 0.02), dpi=100)
-        fig.subplots_adjust(hspace=0)
-        fig.tight_layout()
-        axes=[]
-        axes.append(fig.add_subplot(2, 1, 1))
-        axes[0].set_axis_off()
-        axes[0].margins(0)
-        axes.append(fig.add_subplot(2, 1, 2))
-        axes[1].set_axis_off()
-        axes[1].margins(0)
-
-        Pxx, freqs, bins, im0 = axes[0].specgram(audio_part, Fs=self.framerate_, NFFT=1024, cmap=self.colormap_)
-        image0 = im0.make_image(plt.gcf().canvas.get_renderer())
-        image0 = np.array(image0, dtype=np.uint8)
-        h, w = image0.shape
-        texture = QImage(image0.data, h, w, 3*h, QImage.Format_RGB888)
-        texture.save("texture_test.jpg")
-
-        # spectrum = fft(audio_part, axis=0)
-        # spectrum = np.abs(spectrum[:N//2])
-
-        # audio_part_img = exposure.rescale_intensity(audio_part, out_range=(-1.0, 1.0))
-        # audio_part_img = np.expand_dims(audio_part_img, axis=0)
-        # audio_part_img = resize(audio_part_img, (1, 512), anti_aliasing=True)
-
-        # spectrum_img = exposure.rescale_intensity(spectrum, out_range=(0, 100))
-        # spectrum_img = np.expand_dims(spectrum_img, axis=0)
-        # spectrum_img = resize(spectrum_img, (1, 512), anti_aliasing=True)
-
-        # fig=plt.figure(figsize=(5.12, 0.02), dpi=100)
-        # fig.subplots_adjust(hspace=0)
-        # fig.tight_layout()
-        # axes=[]
-        # axes.append(fig.add_subplot(2, 1, 1))
-        # axes[0].set_axis_off()
-        # axes[0].margins(0)
-        # axes.append(fig.add_subplot(2, 1, 2))
-        # axes[1].set_axis_off()
-        # axes[1].margins(0)
-
-        # axes[0].imshow(spectrum_img, cmap=self.colormap_)
-        # axes[1].imshow(audio_part_img, cmap=self.colormap_)
-
-        # texture_file = f"{self.filename_}_texture_frame_{current_frame}_temp.png"
-        # plt.savefig(texture_file, dpi=fig.dpi)
-        # texture = QImage(texture_file).mirrored(False, False)
-        # Path(texture_file).unlink()
-        # plt.close(fig)
-        return texture
+        wave_samples = InputTextureSound.get_audio_part(self.audio_, position, self.sample_rate_, 512)
+        fft_samples = InputTextureSound.get_audio_part(self.audio_, position, self.sample_rate_, 2048)
+        
+        spectrum = InputTextureSound.calculate_spectrum(fft_samples)
+        
+        # Normalize Waveform: -1..1 -> 0..1 (0.5 is silence)
+        wave_norm = (wave_samples + 1.0) / 2.0
+        # wave_norm = wave_samples
+        wave_norm = np.clip(wave_norm, 0.0, 1.0)
+        
+        # Normalize Spectrum: 0..? -> 0..1
+        spec_norm = np.clip(spectrum, 0.0, 1.0)
+        
+        # Build texture
+        data = np.zeros((2, 512), dtype=np.uint8)
+        data[0, :] = (spec_norm * 255).astype(np.uint8)
+        data[1, :] = (wave_norm * 255).astype(np.uint8)
+        
+        return data.tobytes()
 
     def set_position(self, position: float):
-        self.texture_.setData(self.prepare_texture(position))
+        if DEBUG_USE_SET_AUDIO_POSITION:
+            position = DEBUG_AUDIO_POSITION
+        if position <= self.get_audio_duration() and position >= 0.0:
+            if position != self.current_position_:
+                if self.is_texture_created():
+                    self.texture_.setData(QOpenGLTexture.PixelFormat.Red, 
+                                         QOpenGLTexture.PixelType.UInt8, 
+                                         self.prepare_texture(position))
+                    self.current_position_ = position
 
     def get_thumbnail(self) -> QPixmap:
         pixmap = None
@@ -213,4 +270,3 @@ class InputTextureSound(InputTexture):
 
     def can_be_binded(self):
         return True
-

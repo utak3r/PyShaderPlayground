@@ -1,4 +1,4 @@
-from PySide6.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo, QSettings, QRect
+from PySide6.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo, QSettings, QRect, QTimer
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel, QSplitterHandle, QHBoxLayout, QFrame, QProgressBar, QProgressDialog
 from PySide6.QtGui import QPixmap, QImage
 from PySide6.QtUiTools import QUiLoader
@@ -7,10 +7,11 @@ from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
 from pathlib import Path
 from PyShaderPlayground.process_tools import ProcessRunner
 from PyShaderPlayground.VideoEncodingParams import VideoEncodingParams
+from PyShaderPlayground.ShaderPlaygroundInputs import InputTexture2D, InputTextureSound
 from os import path
 
 class ShaderPlayground(QMainWindow):
-    def __init__(self, preloaded_shader: str = ''):
+    def __init__(self, preloaded_shader: str = '', preloaded_texture: str = ''):
         QMainWindow.__init__(self)
         self.init_ui(path.abspath(path.join(path.dirname(__file__), 'ShaderPlayground.ui')))
         self.opengl = self.centralWidget().player
@@ -51,9 +52,9 @@ class ShaderPlayground(QMainWindow):
         # Support screen pixel ratio, (High DPI)
         self.centralWidget().player.set_screen_pixel_ratio(self.devicePixelRatioF())
 
-        if preloaded_shader != '':
-            self.current_filename = preloaded_shader
-            self.read_shader_from_file(preloaded_shader)
+        self.preloaded_shader = preloaded_shader
+        self.preloaded_texture = preloaded_texture
+        QTimer.singleShot(1000, self.after_startup)
 
 
     def init_ui(self, filename):
@@ -80,6 +81,14 @@ class ShaderPlayground(QMainWindow):
             line.setLineWidth(1)
             layout.addWidget(line)
 
+    @Slot()
+    def after_startup(self):
+        if self.preloaded_texture != '':
+           self.set_texture(0, self.preloaded_texture)
+        if self.preloaded_shader != '':
+            self.current_filename = self.preloaded_shader
+            self.read_shader_from_file(self.preloaded_shader)
+            self.compile_shader()
 
     def closeEvent(self, event):
         """ Closing the main window. """
@@ -132,6 +141,10 @@ class ShaderPlayground(QMainWindow):
     def play_pause_animation(self):
         """ Play/Pause animation. """
         self.opengl.animation_play_pause()
+        # if isinstance(self.opengl.get_texture(0), InputTextureSound):
+        #     self.opengl.get_texture(0).play_audio()
+        # if isinstance(self.opengl.get_texture(1), InputTextureSound):
+        #     self.opengl.get_texture(1).play_audio()
         if self.opengl.is_playing():
             self.centralWidget().btnPlayPause.setText("Pause")
         else:
@@ -163,14 +176,14 @@ class ShaderPlayground(QMainWindow):
     @Slot()
     def load_texture_0(self):
         """ Let user select a texture nr 0. """
-        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav)")
+        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav *.mp3)")
         if filename[0] != "":
             self.set_texture(0, filename[0])
 
     @Slot()
     def load_texture_1(self):
         """ Let user select a texture nr 1. """
-        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav)")
+        filename = QFileDialog.getOpenFileName(self, "Open texture", ".", "Image Files (*.png *.jpg);;Sound Files (*.wav *.mp3)")
         if filename[0] != "":
             self.set_texture(1, filename[0])
 
@@ -229,6 +242,16 @@ class ShaderPlayground(QMainWindow):
             "render_image", "Video Files (*.mp4 *.mov *.avi)")
         if filename[0] != "":
             params_dialog = VideoEncodingParams(self.settings, self)
+            music_added = None
+            music_duration = 0
+            if type(self.opengl.get_texture(0)) is InputTextureSound:
+                music_added = self.opengl.get_texture(0).get_texture_filename()
+                music_duration = self.opengl.get_texture(0).get_audio_duration_ceiling()
+            elif type(self.opengl.get_texture(1)) is InputTextureSound:
+                music_added = self.opengl.get_texture(1).get_texture_filename()
+                music_duration = self.opengl.get_texture(0).get_audio_duration_ceiling()
+            if music_added is not None:
+                params_dialog.set_duration(music_duration)
             if QDialog.Accepted == params_dialog.exec():
                 width = params_dialog.get_width()
                 height = params_dialog.get_height()
@@ -238,8 +261,12 @@ class ShaderPlayground(QMainWindow):
                 try:
                     temp_dir.mkdir()
                 except FileExistsError as exc:
-                    ShaderPlayground.remove_dir(temp_dir)
-                    temp_dir.mkdir()
+                    try:
+                        ShaderPlayground.remove_dir(temp_dir)
+                        temp_dir.mkdir()
+                    except PermissionError as exc2:
+                        print(f'Couldn\'t remove directory {temp_dir}')
+                    
                 # info
                 duration = params_dialog.get_duration()
                 framerate = params_dialog.get_framerate()
@@ -247,10 +274,12 @@ class ShaderPlayground(QMainWindow):
                 ffmpeg = "\"" + params_dialog.get_ffmpeg() + "\""
                 codec = params_dialog.get_codec()
                 # render frames
+                orig_framerate = self.opengl.animation_framerate()
                 self.opengl.animation_stop()
                 render_progress_dlg = QProgressDialog("Rendering frames...", "Abort rendering", 0, frames, self)
                 render_progress_dlg.setWindowModality(Qt.WindowModal)
                 was_canceled = False
+                self.opengl.set_animation_speed(1.0, framerate)
                 for frame in range (frames):
                     render_progress_dlg.setValue(frame)
                     if render_progress_dlg.wasCanceled():
@@ -261,12 +290,16 @@ class ShaderPlayground(QMainWindow):
                 render_progress_dlg.setValue(frames)
                 if not was_canceled:
                     # encode video
-                    command = ffmpeg + " -r " + str(framerate) + " -f image2 -i \"" + str(temp_dir.joinpath("frame_")) + "%06d.png\" " + codec + " -y \"" + filename[0] + "\""
+                    music_cmd = ""
+                    if music_added is not None:
+                        music_cmd = f" -i \"{music_added}\" -acodec copy "
+                    command = f"{ffmpeg} -r {str(framerate)} -f image2 -i \"{str(temp_dir.joinpath("frame_"))}%06d.png\" {music_cmd} -y \"{filename[0]}\""
                     self.runner = ProcessRunner()
                     self.runner.run_command(command)
                 # remove temp files and dir
-                ShaderPlayground.remove_dir(temp_dir)
+                #ShaderPlayground.remove_dir(temp_dir)
                 # resume playing
+                self.opengl.set_animation_speed(1.0, orig_framerate)
                 self.opengl.animation_play()
 
     @staticmethod
