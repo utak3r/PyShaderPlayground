@@ -61,7 +61,8 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         self.timer_ = QTimer(self)
         self.timer_.timeout.connect(self.timer_tick)
         self.set_animation_speed(1.0, 30)
-        self.timer_.start()
+        # self.timer_.start()
+        self.animation_play()
         self.pixel_ratio = 1.0
 
     def set_screen_pixel_ratio(self, ratio:float):
@@ -96,10 +97,18 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
     def animation_pause(self):
         """ Pause animation. """
         self.timer_.stop()
+        if isinstance(self.texture_0_, InputTextureSound):
+            self.texture_0_.play_audio()
+        if isinstance(self.texture_1_, InputTextureSound):
+            self.texture_1_.play_audio()
 
     def animation_play(self):
         """ Play animation. """
         self.timer_.start()
+        if isinstance(self.texture_0_, InputTextureSound):
+            self.texture_0_.play_audio()
+        if isinstance(self.texture_1_, InputTextureSound):
+            self.texture_1_.play_audio()
     
     def animation_stop(self):
         """ Stop and rewind. """
@@ -181,7 +190,8 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
 
     def set_shader(self, user_shader: str):
         """ Replace part of the fragment shader. """
-        self.timer_.stop()
+        # self.timer_.stop()
+        self.animation_pause()
         self.global_time = 0.0
 
         self.makeCurrent()
@@ -212,7 +222,8 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
             self.uniform_iChannel0 = self.program_.uniformLocation("iChannel0")
             self.uniform_iChannel1 = self.program_.uniformLocation("iChannel1")
 
-        self.timer_.start()
+        # self.timer_.start()
+        self.animation_play()
         self.program_.release()
         self.doneCurrent()
 

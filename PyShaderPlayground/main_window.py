@@ -83,12 +83,12 @@ class ShaderPlayground(QMainWindow):
 
     @Slot()
     def after_startup(self):
+        if self.preloaded_texture != '':
+           self.set_texture(0, self.preloaded_texture)
         if self.preloaded_shader != '':
             self.current_filename = self.preloaded_shader
             self.read_shader_from_file(self.preloaded_shader)
             self.compile_shader()
-        if self.preloaded_texture != '':
-           self.set_texture(0, self.preloaded_texture)
 
     def closeEvent(self, event):
         """ Closing the main window. """

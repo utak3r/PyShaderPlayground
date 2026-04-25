@@ -1,6 +1,7 @@
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtOpenGL import QOpenGLTexture
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from enum import Enum
 from pathlib import Path
 from scipy.fftpack import fft, ifft
@@ -192,41 +193,21 @@ class InputTextureSound(InputTexture):
                              QOpenGLTexture.PixelType.UInt8, 
                              self.prepare_texture(0.0))
 
-        # # Playable audio (Stereo if available, native SR for best quality)
-        # self.audio_playable, native_sr = librosa.load(self.filename_, sr=None, mono=False)
-        
-        # # Normalize to int16 range to avoid clipping and ensure audible volume
-        # max_val = np.max(np.abs(self.audio_playable))
-        # if max_val > 0:
-        #     self.audio_playable = self.audio_playable / max_val * 32767
-        
-        # self.audio_playable = self.audio_playable.astype(np.int16)
-        
-        # # Simpleaudio expects (samples, channels) for multi-channel
-        # if self.audio_playable.ndim > 1:
-        #     # librosa returns (channels, samples), simpleaudio wants (samples, channels)
-        #     self.audio_playable = np.ascontiguousarray(self.audio_playable.T)
-        #     num_channels = self.audio_playable.shape[1]
-        # else:
-        #     num_channels = 1
-            
-        # self.audio_play_object = simpleaudio.WaveObject(self.audio_playable, 
-        #                                                 num_channels=num_channels, 
-        #                                                 bytes_per_sample=2, 
-        #                                                 sample_rate=int(native_sr))
-        # self.audio_play_playback = None
+        self.load_playable_audio(self.filename_)
+
+
+    def load_playable_audio(self, filename):
+        self.audio_player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.audio_player.setAudioOutput(self.audio_output)
+        self.audio_player.setSource(QUrl.fromLocalFile(filename))
 
     def play_audio(self):
-        return
-        # if self.audio_play_playback:
-        #     if self.audio_play_playback.is_playing():
-        #         self.audio_play_playback.stop()
-        #         self.audio_play_playback.wait_done()
-        #         self.audio_play_playback = None
-        #     else:
-        #         self.audio_play_playback = self.audio_play_object.play()
-        # else:
-        #     self.audio_play_playback = self.audio_play_object.play()
+        if self.audio_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            self.audio_player.stop()
+        else:
+            self.audio_player.setPosition(int(self.current_position_ * 1000))
+            self.audio_player.play()
 
     @classmethod
     def calculate_spectrum(cls, signal):
