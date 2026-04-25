@@ -56,7 +56,7 @@ plt.show()
     
 
 
-To better understand what's happening thwre, let's move it to dB scale:
+To better understand what's happening there, let's move it to dB scale:
 
 
 ```python
