@@ -1,6 +1,6 @@
 from PySide6.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo, QSettings, QRect, QTimer
-from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel, QSplitterHandle, QHBoxLayout, QFrame, QProgressBar, QProgressDialog
-from PySide6.QtGui import QGuiApplication, QPixmap, QImage
+from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel, QSplitterHandle, QHBoxLayout, QFrame, QProgressBar, QProgressDialog, QInputDialog
+from PySide6.QtGui import QGuiApplication, QPixmap, QImage, QShortcut, QKeySequence, QTextDocument, QTextCursor
 from PySide6.QtUiTools import QUiLoader
 from PyShaderPlayground.opengl_widget import ShaderWidget
 from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
@@ -34,6 +34,14 @@ class ShaderPlayground(QMainWindow):
         self.centralWidget().btnSaveImage.clicked.connect(self.save_image)
         self.centralWidget().btnRecordAnimation.clicked.connect(self.render_animation)
         self.centralWidget().AnimationSlider.valueUpdated.connect(self.change_animation)
+
+        self.last_search_text = ""
+        self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self.search_shortcut.activated.connect(self.open_search_dialog)
+        self.find_next_shortcut = QShortcut(QKeySequence("F3"), self)
+        self.find_next_shortcut.activated.connect(self.find_next)
+        self.find_prev_shortcut = QShortcut(QKeySequence("Shift+F3"), self)
+        self.find_prev_shortcut.activated.connect(self.find_prev)
 
         self.current_filename = ""
         #self.resize(1280, 540)
@@ -162,6 +170,43 @@ class ShaderPlayground(QMainWindow):
     def rewind_animation(self):
         """ Rewind an animation. Doesn't change the playing state. """
         self.opengl.animation_rewind()
+
+    @Slot()
+    def open_search_dialog(self):
+        """ Open a find dialog and search for text. """
+        # Pre-fill with selection if available
+        cursor = self.centralWidget().txtShaderEditor.textCursor()
+        if cursor.hasSelection():
+            self.last_search_text = cursor.selectedText()
+
+        text, ok = QInputDialog.getText(self, "Find", "Search for:", text=self.last_search_text)
+        if ok and text:
+            self.last_search_text = text
+            self.find_next()
+
+    @Slot()
+    def find_next(self):
+        """ Find next occurrence of the search text. """
+        if self.last_search_text:
+            found = self.centralWidget().txtShaderEditor.find(self.last_search_text)
+            if not found:
+                # Wrap around: move cursor to start and try again
+                cursor = self.centralWidget().txtShaderEditor.textCursor()
+                cursor.movePosition(QTextCursor.Start)
+                self.centralWidget().txtShaderEditor.setTextCursor(cursor)
+                self.centralWidget().txtShaderEditor.find(self.last_search_text)
+
+    @Slot()
+    def find_prev(self):
+        """ Find previous occurrence of the search text. """
+        if self.last_search_text:
+            found = self.centralWidget().txtShaderEditor.find(self.last_search_text, QTextDocument.FindBackward)
+            if not found:
+                # Wrap around: move cursor to end and try again
+                cursor = self.centralWidget().txtShaderEditor.textCursor()
+                cursor.movePosition(QTextCursor.End)
+                self.centralWidget().txtShaderEditor.setTextCursor(cursor)
+                self.centralWidget().txtShaderEditor.find(self.last_search_text, QTextDocument.FindBackward)
 
     @Slot()
     def change_animation(self, value):
