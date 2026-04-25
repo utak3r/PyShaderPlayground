@@ -3,24 +3,37 @@ from PySide6.QtCore import Qt, QRegularExpression
 
 class GLSLSyntaxHighlighter(QSyntaxHighlighter):
     """ Syntax highlighting for GLSL. """
+
+    THEMES = {
+        'light': {
+            'keyword': Qt.darkBlue,
+            'datatype': Qt.darkBlue,
+            'comment': Qt.darkGray,
+            'quotation': Qt.darkGreen,
+            'bold_keywords': True
+        },
+        'dark': {
+            'keyword': Qt.cyan,
+            'datatype': Qt.magenta,
+            'comment': Qt.gray,
+            'quotation': Qt.yellow,
+            'bold_keywords': True
+        }
+    }
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
         self.highlightingRules = []
 
-        # keywords format
+        # Initialize formats
         self.keyword_format = QTextCharFormat()
-        self.keyword_format.setForeground(Qt.darkBlue)
-        self.keyword_format.setFontWeight(QFont.Bold)
-        keyword_patterns = [
-            "\\bvoid\\b", "\\breturn\\b", "\\bin\\b", "\\bout\\b"
-        ]
-        for pattern in keyword_patterns:
-            rule = HighlightingRule(pattern, self.keyword_format)
-            self.highlightingRules.append(rule)
-        # data types format
         self.datatype_format = QTextCharFormat()
-        self.datatype_format.setForeground(Qt.darkBlue)
+        self.comment_format = QTextCharFormat()
+        self.quotation_format = QTextCharFormat()
+
+        # Define patterns
+        keyword_patterns = ["\\bvoid\\b", "\\breturn\\b", "\\bin\\b", "\\bout\\b"]
         datatypes_patterns = [
             "\\bfloat\\b", "\\bint\\b", "\\bbool\\b", "\\buint\\b",
             "\\bdouble\\b", "\\bvec2\\b", "\\bvec3\\b", "\\bvec4\\b",
@@ -29,21 +42,40 @@ class GLSLSyntaxHighlighter(QSyntaxHighlighter):
             "\\buvec4\\b", "\\bbvec2\\b", "\\bbvec3\\b", "\\bbvec4\\b",
             "\\bmat3\\b"
         ]
+
+        # Create rules
+        for pattern in keyword_patterns:
+            self.highlightingRules.append(HighlightingRule(pattern, self.keyword_format))
         for pattern in datatypes_patterns:
-            rule = HighlightingRule(pattern, self.datatype_format)
-            self.highlightingRules.append(rule)
-        # comments format
-        self.comment_format = QTextCharFormat()
-        self.comment_format.setForeground(Qt.darkGray)
-        rule = HighlightingRule("//[^\n]*", self.comment_format)
-        self.highlightingRules.append(rule)
+            self.highlightingRules.append(HighlightingRule(pattern, self.datatype_format))
+        
+        self.highlightingRules.append(HighlightingRule("//[^\n]*", self.comment_format))
+        self.highlightingRules.append(HighlightingRule("\".*\"", self.quotation_format))
+
         self.multiline_comment_start_expr = QRegularExpression("/\\*")
         self.multiline_comment_end_expr = QRegularExpression("\\*/")
-        # quotation format
-        self.quotation_format = QTextCharFormat()
-        self.quotation_format.setForeground(Qt.darkGreen)
-        rule = HighlightingRule("\".*\"", self.quotation_format)
-        self.highlightingRules.append(rule)
+
+        # Set default theme
+        self.set_theme('light')
+
+    def set_theme(self, theme_name: str):
+        """ Change the colors depending on theme (light/dark). """
+        if theme_name not in self.THEMES:
+            return
+
+        theme = self.THEMES[theme_name]
+        
+        self.keyword_format.setForeground(theme['keyword'])
+        if theme.get('bold_keywords', False):
+            self.keyword_format.setFontWeight(QFont.Bold)
+        else:
+            self.keyword_format.setFontWeight(QFont.Normal)
+
+        self.datatype_format.setForeground(theme['datatype'])
+        self.comment_format.setForeground(theme['comment'])
+        self.quotation_format.setForeground(theme['quotation'])
+
+        self.rehighlight()
 
     @staticmethod
     def find_match(text: str, regexpr: QRegularExpression, offset: int = 0) -> int:

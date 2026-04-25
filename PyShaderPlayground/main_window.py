@@ -1,6 +1,6 @@
 from PySide6.QtCore import QCoreApplication, Qt, Slot, Signal, QUrl, QFile, QIODevice, QFileInfo, QSettings, QRect, QTimer
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QSizePolicy, QDialog, QSlider, QLabel, QSplitterHandle, QHBoxLayout, QFrame, QProgressBar, QProgressDialog
-from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtGui import QGuiApplication, QPixmap, QImage
 from PySide6.QtUiTools import QUiLoader
 from PyShaderPlayground.opengl_widget import ShaderWidget
 from PyShaderPlayground.text_tools import GLSLSyntaxHighlighter
@@ -16,6 +16,14 @@ class ShaderPlayground(QMainWindow):
         self.init_ui(path.abspath(path.join(path.dirname(__file__), 'ShaderPlayground.ui')))
         self.opengl = self.centralWidget().player
         self.syntax_highlighter = GLSLSyntaxHighlighter(self.centralWidget().txtShaderEditor.document())
+        
+        # check the app's style and set syntax highlighter's theme accordingly
+        style_hints = QGuiApplication.styleHints()
+        scheme = style_hints.colorScheme()
+        if scheme == Qt.ColorScheme.Dark:
+            self.syntax_highlighter.set_theme('dark')
+        elif scheme == Qt.ColorScheme.Light:
+            self.syntax_highlighter.set_theme('light')
 
         self.centralWidget().txtShaderEditor.setText(self.opengl.get_shader())
         self.centralWidget().btnCompile.clicked.connect(self.compile_shader)
