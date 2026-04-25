@@ -230,19 +230,20 @@ class InputTextureSound(InputTexture):
 
     @classmethod
     def calculate_spectrum(cls, signal):
-        # Windowed FFT of 2048 samples to get 1024 bins,
+        # Windowed FFT (Hann filter) of 2048 samples to get 1024 bins,
         # Take first 512 bins (0 to 11025 Hz).
-        
         window = np.hanning(len(signal))
         windowed_signal = signal * window
-        
         fft_res = np.fft.rfft(windowed_signal)
         
-        magnitude = np.abs(fft_res)
-        
-        # Normalize
-        magnitude = magnitude / 32.0 
-        
+        magnitude = np.abs(fft_res)[:512]
+
+        # Flatten and rescale into 0..1 range
+        magnitude = np.log10(magnitude + 1.0)
+        magrange = np.max(magnitude) - np.min(magnitude)
+        magnitude -= np.min(magnitude)
+        magnitude /= magrange
+                
         return magnitude[:512]
 
     def prepare_texture(self, position: float):
@@ -253,6 +254,7 @@ class InputTextureSound(InputTexture):
         
         # Normalize Waveform: -1..1 -> 0..1 (0.5 is silence)
         wave_norm = (wave_samples + 1.0) / 2.0
+        # wave_norm = wave_samples
         wave_norm = np.clip(wave_norm, 0.0, 1.0)
         
         # Normalize Spectrum: 0..? -> 0..1
