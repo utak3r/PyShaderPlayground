@@ -25,7 +25,7 @@ position = 0.0 # position in the audio file
 signal = get_audio_part(audio_, position, sample_rate_, 2048)
 ```
 
-Now we can perform a regulat FFT analysis of frequencies. We will use [Hann window](https://numpy.org/doc/2.3/reference/generated/numpy.hanning.html) filtering.
+Now we can perform a regular FFT analysis of frequencies. We will use [Hann window](https://numpy.org/doc/2.3/reference/generated/numpy.hanning.html) filtering.
 
 
 ```python
@@ -133,5 +133,9 @@ display(img)
 ![png](sound_analysis_files/sound_analysis_10_0.png)
     
 
+
+Animated real-life example:
+
+![gif](./final_texture.gif)
 
 In final visualizer, we will also add a second row of data, representing a waveform of the audio part, but that is pretty straightforward.
