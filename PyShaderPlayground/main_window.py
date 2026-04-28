@@ -8,6 +8,7 @@ from pathlib import Path
 from PyShaderPlayground.process_tools import ProcessRunner
 from PyShaderPlayground.VideoEncodingParams import VideoEncodingParams
 from PyShaderPlayground.ShaderPlaygroundInputs import InputTexture2D, InputTextureSound
+from PyShaderPlayground.sliders_window import ShaderSlidersWindow
 from os import path
 
 class ShaderPlayground(QMainWindow):
@@ -57,6 +58,9 @@ class ShaderPlayground(QMainWindow):
         self.centralWidget().texture0.clicked.connect(self.load_texture_0)
         self.centralWidget().texture1.clicked.connect(self.load_texture_1)
         self.runner = None
+
+        self.slider_window = ShaderSlidersWindow(self)
+        self.slider_window.value_changed.connect(self.opengl.set_dynamic_uniform_value)
 
         self.settings = QSettings("ShaderPlayground.ini", QSettings.IniFormat)
         self.settings.beginGroup("Geometry")
@@ -119,7 +123,8 @@ class ShaderPlayground(QMainWindow):
     def compile_shader(self):
         """ Compile and link a new shader. """
         shader = self.centralWidget().txtShaderEditor.toPlainText()
-        self.opengl.set_shader(shader)
+        dynamic_uniforms = self.opengl.set_shader(shader)
+        self.slider_window.update_sliders(dynamic_uniforms)
 
     def read_shader_from_file(self, filename: str):
         if filename != "":

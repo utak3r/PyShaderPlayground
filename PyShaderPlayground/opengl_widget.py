@@ -5,6 +5,7 @@ from PySide6.QtGui import QSurfaceFormat, QOpenGLFunctions, QImage
 from PySide6.QtOpenGL import QOpenGLShader, QOpenGLShaderProgram, QOpenGLFramebufferObject, QOpenGLTexture
 from PySide6.QtCore import QTimer
 import os
+import re
 from pathlib import Path
 from PyShaderPlayground.ShaderPlaygroundInputs import InputTexture, InputTexture2D, InputTextureSound
 
@@ -64,6 +65,7 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         # self.timer_.start()
         self.animation_play()
         self.pixel_ratio = 1.0
+        self.dynamic_uniforms = {} # Stores metadata for sliders: { name: { type, min, max, step, value } }
 
     def set_screen_pixel_ratio(self, ratio:float):
         self.pixel_ratio = ratio
@@ -196,7 +198,62 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
 
         self.makeCurrent()
         self.shader_user_ = user_shader
-        if not self.shader_fragment_.compileSourceCode(self.shader_template_pre_ + self.shader_user_ + self.shader_template_post_):
+        
+        # Parse dynamic uniforms (sliders)
+        self.dynamic_uniforms = {}
+        # Pattern: const <type> <name> = <val>; //!<slider(min, max, step)>
+        pattern = r'const\s+(float|vec2|vec3|vec4)\s+(\w+)\s*=\s*(.*?)\s*;\s*//!<slider\((.*?)\)>'
+        matches = re.finditer(pattern, self.shader_user_)
+        
+        injected_uniforms = ""
+        modified_user_shader = self.shader_user_
+        
+        for match in matches:
+            var_type = match.group(1)
+            var_name = match.group(2)
+            var_init = match.group(3)
+            slider_params = match.group(4).split(',')
+            
+            try:
+                s_min = float(slider_params[0].strip())
+                s_max = float(slider_params[1].strip())
+                s_step = float(slider_params[2].strip())
+            except (IndexError, ValueError):
+                continue
+                
+            # Parse initial value
+            init_values = []
+            if var_type == 'float':
+                try:
+                    init_values = [float(var_init)]
+                except ValueError:
+                    init_values = [s_min] # Fallback
+            else:
+                # Extract numbers from the initialization string, but skip the type prefix (e.g., 'vec3(')
+                init_val_content = var_init
+                if '(' in var_init:
+                    init_val_content = var_init[var_init.find('('):]
+                nums = re.findall(r'[-+]?\d*\.\d+|\d+', init_val_content)
+                init_values = [float(n) for n in nums]
+                # Pad or truncate to match type
+                size = int(var_type[-1])
+                if len(init_values) < size:
+                    init_values += [0.0] * (size - len(init_values))
+                init_values = init_values[:size]
+            
+            self.dynamic_uniforms[var_name] = {
+                'type': var_type,
+                'min': s_min,
+                'max': s_max,
+                'step': s_step,
+                'value': init_values
+            }
+            
+            injected_uniforms += f"uniform {var_type} {var_name};\n"
+            # Comment out the original const line
+            modified_user_shader = modified_user_shader.replace(match.group(0), f"// {match.group(0)}")
+
+        if not self.shader_fragment_.compileSourceCode(self.shader_template_pre_ + injected_uniforms + modified_user_shader + self.shader_template_post_):
             log = self.shader_fragment_.log()
             # for debug:
             with open('fragment_shader.temp.glsl', 'w') as f:
@@ -209,23 +266,29 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
             self.program_.link()
             self.program_.bind()
 
-            # for debug:
-            """ with open('fragment_vertex.temp.glsl', 'w') as f:
-                f.write(self.shader_vertex_.sourceCode().toStdString())
-            with open('fragment_shader.temp.glsl', 'w') as f:
-                f.write(self.shader_fragment_.sourceCode().toStdString()) """
-
             self.attrib_position = self.program_.attributeLocation("position")
             self.uniform_iGlobalTime = self.program_.uniformLocation("iGlobalTime")
             self.uniform_iResolution = self.program_.uniformLocation("iResolution")
             self.uniform_iMouse = self.program_.uniformLocation("iMouse")
             self.uniform_iChannel0 = self.program_.uniformLocation("iChannel0")
             self.uniform_iChannel1 = self.program_.uniformLocation("iChannel1")
+            
+            # Store uniform locations for dynamic uniforms
+            for name in self.dynamic_uniforms:
+                self.dynamic_uniforms[name]['location'] = self.program_.uniformLocation(name)
 
         # self.timer_.start()
         self.animation_play()
         self.program_.release()
         self.doneCurrent()
+        return self.dynamic_uniforms
+
+    def set_dynamic_uniform_value(self, name: str, index: int, value: float):
+        """ Update a specific component of a dynamic uniform. """
+        if name in self.dynamic_uniforms:
+            if index < len(self.dynamic_uniforms[name]['value']):
+                self.dynamic_uniforms[name]['value'][index] = value
+                self.update()
 
 
     def get_shader(self) -> str:
@@ -267,6 +330,21 @@ class ShaderWidget(QOpenGLWidget, QOpenGLFunctions):
         if self.texture_1_.can_be_binded():
             self.texture_1_.bind(1)
         self.program_.setUniformValue(self.uniform_iChannel1, int(1))
+
+        # Set dynamic uniforms
+        for name, data in self.dynamic_uniforms.items():
+            loc = data.get('location', -1)
+            if loc != -1:
+                val = data['value']
+                if data['type'] == 'float':
+                    # somehow it doesn't work with setUniformValue, so let's use glUniform1f directly
+                    self.glUniform1f(loc, float(val[0]))
+                elif data['type'] == 'vec2':
+                    self.program_.setUniformValue(loc, float(val[0]), float(val[1]))
+                elif data['type'] == 'vec3':
+                    self.program_.setUniformValue(loc, float(val[0]), float(val[1]), float(val[2]))
+                elif data['type'] == 'vec4':
+                    self.program_.setUniformValue(loc, float(val[0]), float(val[1]), float(val[2]), float(val[3]))
 
         self.program_.setAttributeArray(self.attrib_position, self.vertices_, 2, 0)
         self.glEnableVertexAttribArray(self.attrib_position)
