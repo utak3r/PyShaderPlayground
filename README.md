@@ -1,8 +1,18 @@
 # PyShaderPlayground
 
-PyShaderPlayground is a simple tool for editing GLSL fragment shaders and instantly testing them in an OpenGL window. There're few predefined uniforms, like image resolution or running time. The names of those are made to be compatible with *ShaderToy*. The editor has a simple syntax highlighting.
+PyShaderPlayground is a tool for editing GLSL fragment shaders and instantly testing them in an OpenGL window. There're few predefined uniforms, like image resolution or running time. The names of those are made to be compatible with [ShaderToy](https://www.shadertoy.com/). 
 
-It also has offscreen rendering implemented, to render high resolution images, also it's capable of rendering an animation of a given resolution, fps and length. It's utilizing ffmpeg for that task.
+Some of the feature:
+
+- adapting to system theme (dark/light mode)
+- simple syntax highlighting
+- 2 slots for textures loading
+- offscreen rendering to render high resolution images
+- animation rendering (resolution, fps and length)
+- ffmpeg integration for animation rendering
+- support for sound textures, for visualizations of sound
+- dynamic sliders for uniforms declared directly in the code
+
 
 ![](docs/screenshot.png)
 
@@ -10,14 +20,12 @@ It also has offscreen rendering implemented, to render high resolution images, a
 
 PyShaderPlayground is written in *Python 3.12* and *Qt* (*PySide6*).
 
-* Python 3.12.6
-* PySide6 6.7.3
+* Python 3.12.7
+* PySide6 6.11.0
 * PyOpenGL 3.1.7
 * scipy 1.14.1
 * matplotlib 3.9.2
 * scikit-image 0.24.0
-
-There're also some Visual Code files included (_launch.json_ and _tasks.json_)
 
 ## Creating standalone app ##
 
@@ -29,5 +37,3 @@ to achieve that. Just run:
 ```
 pyinstaller --clean PyShaderPlayground.spec
 ```
-
-or use predefined task in Visual Code.
